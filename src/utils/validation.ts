@@ -209,3 +209,46 @@ export const validateUpdateCommodity = (data: any): { isValid: boolean; errors: 
 
   return { isValid: errors.length === 0, errors };
 };
+
+export const validatePlaceOrder = (data: any): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+
+  if (!data.deliveryAddress || typeof data.deliveryAddress !== 'string' || data.deliveryAddress.trim().length === 0) {
+    errors.push('Delivery address is required and must be a valid string');
+  }
+
+  return { isValid: errors.length === 0, errors };
+};
+
+export const validateVerifyOrder = (data: any): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+
+  if (!data.txRef || typeof data.txRef !== 'string') {
+    errors.push('Transaction reference (txRef) is required');
+  }
+
+  if (!data.transactionId || typeof data.transactionId !== 'string') {
+    errors.push('Transaction ID is required');
+  }
+
+  if (data.status !== undefined && typeof data.status !== 'string') {
+    errors.push('Status must be a valid string if provided');
+  }
+
+  return { isValid: errors.length === 0, errors };
+};
+
+export const validateConfirmOrder = (data: any): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+
+  if (!data.txRef || typeof data.txRef !== 'string') {
+    errors.push('Transaction reference (txRef) is required');
+  }
+
+  return { isValid: errors.length === 0, errors };
+};
+
+export const validateOrderStatus = (status: string): boolean => {
+  const validStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
+  return validStatuses.includes(status);
+};
