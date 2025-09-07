@@ -409,6 +409,58 @@ export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
   sender: one(users, { fields: [chatMessages.senderId], references: [users.id] }),
 }));
 
+// Receipts table
+export const receipts = pgTable("receipts", {
+  id: serial("id").primaryKey(),
+  receiptNumber: text("receipt_number").notNull().unique(),
+  orderId: integer("order_id").notNull().references(() => orders.id),
+  customerId: integer("customer_id").notNull().references(() => users.id),
+  merchantId: integer("merchant_id").notNull().references(() => users.id),
+  driverId: integer("driver_id").references(() => users.id),
+  totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
+  paymentMethod: text("payment_method").notNull(),
+  paymentStatus: text("payment_status", { 
+    enum: ["PENDING", "COMPLETED", "FAILED", "REFUNDED"] 
+  }).notNull().default("PENDING"),
+  transactionRef: text("transaction_ref"),
+  qrCodeData: text("qr_code_data").notNull(),
+  qrCodeImageUrl: text("qr_code_image_url"),
+  receiptPdfUrl: text("receipt_pdf_url"),
+  deliveryStatus: text("delivery_status", { 
+    enum: ["PENDING", "IN_TRANSIT", "DELIVERED", "FAILED"] 
+  }).default("PENDING"),
+  deliveryVerifiedAt: timestamp("delivery_verified_at"),
+  deliveryVerifiedBy: integer("delivery_verified_by").references(() => users.id),
+  merchantVerifiedAt: timestamp("merchant_verified_at"),
+  merchantVerifiedBy: integer("merchant_verified_by").references(() => users.id),
+  adminVerifiedAt: timestamp("admin_verified_at"),
+  adminVerifiedBy: integer("admin_verified_by").references(() => users.id),
+  isActive: boolean("is_active").default(true),
+  metadata: json("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Receipt relations
+export const receiptsRelations = relations(receipts, ({ one }) => ({
+  order: one(orders, {
+    fields: [receipts.orderId],
+    references: [orders.id],
+  }),
+  customer: one(users, {
+    fields: [receipts.customerId],
+    references: [users.id],
+  }),
+  merchant: one(users, {
+    fields: [receipts.merchantId],
+    references: [users.id],
+  }),
+  driver: one(users, {
+    fields: [receipts.driverId],
+    references: [users.id],
+  }),
+}));
+
 // Validation schemas
 export const insertUserSchema = createInsertSchema(users);
 export const insertProductSchema = createInsertSchema(products);
@@ -425,6 +477,7 @@ export const insertSupportTicketSchema = createInsertSchema(supportTickets);
 export const insertIdentityVerificationSchema = createInsertSchema(identityVerifications);
 export const insertDriverVerificationSchema = createInsertSchema(driverVerifications);
 export const insertPhoneVerificationSchema = createInsertSchema(phoneVerifications);
+export const insertReceiptSchema = createInsertSchema(receipts);
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -456,3 +509,5 @@ export type DriverVerification = typeof driverVerifications.$inferSelect;
 export type NewDriverVerification = typeof driverVerifications.$inferInsert;
 export type PhoneVerification = typeof phoneVerifications.$inferSelect;
 export type NewPhoneVerification = typeof phoneVerifications.$inferInsert;
+export type Receipt = typeof receipts.$inferSelect;
+export type NewReceipt = typeof receipts.$inferInsert;
