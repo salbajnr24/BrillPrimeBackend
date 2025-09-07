@@ -252,3 +252,145 @@ export const validateOrderStatus = (status: string): boolean => {
   const validStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
   return validStatuses.includes(status);
 };
+
+export const validateUpdateProfile = (data: any): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+
+  if (data.email !== undefined && !validateEmail(data.email)) {
+    errors.push('Valid email is required if provided');
+  }
+
+  if (data.fullName !== undefined && (typeof data.fullName !== 'string' || data.fullName.trim().length < 2)) {
+    errors.push('Full name must be at least 2 characters long if provided');
+  }
+
+  if (data.phone !== undefined && !validatePhone(data.phone)) {
+    errors.push('Valid phone number is required if provided');
+  }
+
+  if (data.imageUrl !== undefined && typeof data.imageUrl !== 'string') {
+    errors.push('Image URL must be a valid string if provided');
+  }
+
+  if (data.location !== undefined && typeof data.location !== 'string') {
+    errors.push('Location must be a valid string if provided');
+  }
+
+  return { isValid: errors.length === 0, errors };
+};
+
+export const validateCreateVendor = (data: any): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+
+  if (!data.address || typeof data.address !== 'string' || data.address.trim().length === 0) {
+    errors.push('Address is required and must be a valid string');
+  }
+
+  if (!data.businessName || typeof data.businessName !== 'string' || data.businessName.trim().length === 0) {
+    errors.push('Business name is required and must be a valid string');
+  }
+
+  if (data.businessCategory !== undefined && typeof data.businessCategory !== 'string') {
+    errors.push('Business category must be a valid string if provided');
+  }
+
+  if (data.businessNumber !== undefined && typeof data.businessNumber !== 'string') {
+    errors.push('Business number must be a valid string if provided');
+  }
+
+  if (data.businessEmail !== undefined && (typeof data.businessEmail !== 'string' || !validateEmail(data.businessEmail))) {
+    errors.push('Valid business email is required if provided');
+  }
+
+  if (!Array.isArray(data.openingHours)) {
+    errors.push('Opening hours must be an array');
+  } else {
+    data.openingHours.forEach((hours: any, index: number) => {
+      if (hours.dayOfWeek !== undefined && typeof hours.dayOfWeek !== 'string') {
+        errors.push(`Opening hours[${index}]: Day of week must be a valid string if provided`);
+      }
+      if (hours.openTime !== undefined && typeof hours.openTime !== 'string') {
+        errors.push(`Opening hours[${index}]: Open time must be a valid string if provided`);
+      }
+      if (hours.closeTime !== undefined && typeof hours.closeTime !== 'string') {
+        errors.push(`Opening hours[${index}]: Close time must be a valid string if provided`);
+      }
+    });
+  }
+
+  return { isValid: errors.length === 0, errors };
+};
+
+export const validateUpdateVendor = (data: any): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+
+  if (data.address !== undefined && (typeof data.address !== 'string' || data.address.trim().length === 0)) {
+    errors.push('Address must be a valid string if provided');
+  }
+
+  if (data.businessName !== undefined && (typeof data.businessName !== 'string' || data.businessName.trim().length === 0)) {
+    errors.push('Business name must be a valid string if provided');
+  }
+
+  if (data.businessCategory !== undefined && typeof data.businessCategory !== 'string') {
+    errors.push('Business category must be a valid string if provided');
+  }
+
+  if (data.businessNumber !== undefined && typeof data.businessNumber !== 'string') {
+    errors.push('Business number must be a valid string if provided');
+  }
+
+  if (data.accountName !== undefined && typeof data.accountName !== 'string') {
+    errors.push('Account name must be a valid string if provided');
+  }
+
+  if (data.bankName !== undefined && typeof data.bankName !== 'string') {
+    errors.push('Bank name must be a valid string if provided');
+  }
+
+  if (data.accountNumber !== undefined && typeof data.accountNumber !== 'string') {
+    errors.push('Account number must be a valid string if provided');
+  }
+
+  if (data.openingHours !== undefined) {
+    if (!Array.isArray(data.openingHours)) {
+      errors.push('Opening hours must be an array if provided');
+    } else {
+      data.openingHours.forEach((hours: any, index: number) => {
+        if (hours.dayOfWeek !== undefined && typeof hours.dayOfWeek !== 'string') {
+          errors.push(`Opening hours[${index}]: Day of week must be a valid string if provided`);
+        }
+        if (hours.openTime !== undefined && typeof hours.openTime !== 'string') {
+          errors.push(`Opening hours[${index}]: Open time must be a valid string if provided`);
+        }
+        if (hours.closeTime !== undefined && typeof hours.closeTime !== 'string') {
+          errors.push(`Opening hours[${index}]: Close time must be a valid string if provided`);
+        }
+      });
+    }
+  }
+
+  return { isValid: errors.length === 0, errors };
+};
+
+export const validateAddBankDetails = (data: any): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+
+  if (!data.accountName || typeof data.accountName !== 'string' || data.accountName.trim().length === 0) {
+    errors.push('Account name is required and must be a valid string');
+  }
+
+  if (!data.bankName || typeof data.bankName !== 'string' || data.bankName.trim().length === 0) {
+    errors.push('Bank name is required and must be a valid string');
+  }
+
+  if (!data.accountNumber || typeof data.accountNumber !== 'string' || data.accountNumber.trim().length === 0) {
+    errors.push('Account number is required and must be a valid string');
+  }
+
+  if (!data.bankCode || typeof data.bankCode !== 'string' || data.bankCode.trim().length === 0) {
+    errors.push('Bank code is required and must be a valid string');
+  }
+
+  return { isValid: errors.length === 0, errors };
+};
