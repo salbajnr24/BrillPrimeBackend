@@ -1,16 +1,25 @@
 
+export enum Role {
+  CONSUMER = 'CONSUMER',
+  VENDOR = 'VENDOR',
+  DRIVER = 'DRIVER',
+}
+
+// Keep MERCHANT as alias for backward compatibility
+export type UserRole = 'CONSUMER' | 'MERCHANT' | 'DRIVER' | 'VENDOR';
+
 export interface SignUpDto {
   email: string;
   fullName: string;
   password: string;
   phone: string;
-  role: 'CONSUMER' | 'MERCHANT' | 'DRIVER';
+  role: UserRole;
 }
 
 export interface SignInDto {
   email: string;
   password: string;
-  role: 'CONSUMER' | 'MERCHANT' | 'DRIVER';
+  role: UserRole;
 }
 
 export interface ChangePasswordDto {
@@ -39,7 +48,7 @@ export interface UpdateUserDto {
   fullName?: string;
   password?: string;
   phone?: string;
-  role?: 'CONSUMER' | 'MERCHANT' | 'DRIVER';
+  role?: UserRole;
 }
 
 export interface UpdateProfileDto {

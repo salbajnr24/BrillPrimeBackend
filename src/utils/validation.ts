@@ -8,7 +8,7 @@ export const validatePassword = (password: string): boolean => {
 };
 
 export const validateRole = (role: string): boolean => {
-  return ['CONSUMER', 'MERCHANT', 'DRIVER'].includes(role);
+  return ['CONSUMER', 'VENDOR', 'DRIVER', 'MERCHANT'].includes(role);
 };
 
 export const validatePhone = (phone: string): boolean => {
@@ -36,7 +36,7 @@ export const validateSignUp = (data: any): { isValid: boolean; errors: string[] 
   }
 
   if (!data.role || !validateRole(data.role)) {
-    errors.push('Role must be one of: CONSUMER, MERCHANT, DRIVER');
+    errors.push('Role must be one of: CONSUMER, VENDOR, DRIVER, MERCHANT');
   }
 
   return { isValid: errors.length === 0, errors };
@@ -54,7 +54,7 @@ export const validateSignIn = (data: any): { isValid: boolean; errors: string[] 
   }
 
   if (!data.role || !validateRole(data.role)) {
-    errors.push('Role must be one of: CONSUMER, MERCHANT, DRIVER');
+    errors.push('Role must be one of: CONSUMER, VENDOR, DRIVER, MERCHANT');
   }
 
   return { isValid: errors.length === 0, errors };
