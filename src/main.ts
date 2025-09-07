@@ -15,6 +15,11 @@ import chatRoutes from './routes/chat';
 import analyticsRoutes from './routes/analytics';
 import paymentRoutes from './routes/payment';
 import commoditiesRoutes from './routes/commodities';
+import notificationsRoutes from './routes/notifications';
+import supportRoutes from './routes/support';
+import verificationRoutes from './routes/verification';
+import uploadRoutes from './routes/upload';
+import adminRoutes from './routes/admin';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -60,6 +65,11 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/commodities', commoditiesRoutes);
+app.use('/api/notifications', notificationsRoutes);
+app.use('/api/support', supportRoutes);
+app.use('/api/verification', verificationRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/admin', adminRoutes);
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
@@ -149,6 +159,50 @@ app.get('/api', (req, res) => {
         'POST /api/commodities': 'Create commodity (admin only)',
         'PUT /api/commodities/:id': 'Update commodity (admin only)',
         'DELETE /api/commodities/:id': 'Delete commodity (admin only)',
+      },
+      notifications: {
+        'GET /api/notifications': 'Get merchant notifications (merchant only)',
+        'PUT /api/notifications/:id/read': 'Mark notification as read (merchant only)',
+        'PUT /api/notifications/mark-all-read': 'Mark all notifications as read (merchant only)',
+        'GET /api/notifications/unread-count': 'Get unread notifications count (merchant only)',
+        'POST /api/notifications': 'Create notification (internal/system use)',
+        'DELETE /api/notifications/:id': 'Delete notification (merchant only)',
+      },
+      support: {
+        'POST /api/support/tickets': 'Create support ticket (public/authenticated)',
+        'GET /api/support/tickets': 'Get user support tickets (authenticated)',
+        'GET /api/support/tickets/:id': 'Get specific ticket details (authenticated/public with email)',
+        'PUT /api/support/tickets/:id': 'Update ticket (admin only)',
+        'GET /api/support/admin/tickets': 'Get all tickets (admin only)',
+        'GET /api/support/admin/stats': 'Get support statistics (admin only)',
+      },
+      verification: {
+        'POST /api/verification/identity': 'Submit identity verification (authenticated)',
+        'POST /api/verification/driver': 'Submit driver verification (driver only)',
+        'POST /api/verification/phone': 'Submit phone verification (authenticated)',
+        'POST /api/verification/phone/verify': 'Verify phone OTP (authenticated)',
+        'GET /api/verification/status': 'Get verification status (authenticated)',
+        'PUT /api/verification/admin/identity/:id/approve': 'Approve identity verification (admin only)',
+        'PUT /api/verification/admin/identity/:id/reject': 'Reject identity verification (admin only)',
+        'PUT /api/verification/admin/driver/:id/approve': 'Approve driver verification (admin only)',
+        'PUT /api/verification/admin/driver/:id/reject': 'Reject driver verification (admin only)',
+        'GET /api/verification/admin/pending': 'Get pending verifications (admin only)',
+      },
+      upload: {
+        'POST /api/upload/image': 'Upload single image (authenticated)',
+        'POST /api/upload/images': 'Upload multiple images (authenticated)',
+        'POST /api/upload/document': 'Upload document (authenticated)',
+        'DELETE /api/upload/:type/:filename': 'Delete uploaded file (authenticated)',
+        'GET /api/upload/info/:type/:filename': 'Get file info (public)',
+        'GET /api/upload/:type/:filename': 'Serve uploaded files (public)',
+      },
+      admin: {
+        'GET /api/admin/users': 'Get all users with filters (admin only)',
+        'PUT /api/admin/users/:id/verify': 'Verify user identity (admin only)',
+        'GET /api/admin/analytics/platform': 'Get platform-wide analytics (admin only)',
+        'GET /api/admin/drivers/verification-requests': 'Get pending driver verifications (admin only)',
+        'PUT /api/admin/users/:id/status': 'Suspend or activate user account (admin only)',
+        'GET /api/admin/system/health': 'Get system health metrics (admin only)',
       },
     },
     authentication: {
