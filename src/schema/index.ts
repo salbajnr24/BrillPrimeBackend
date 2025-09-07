@@ -413,7 +413,7 @@ export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
 export const receipts = pgTable("receipts", {
   id: serial("id").primaryKey(),
   receiptNumber: text("receipt_number").notNull().unique(),
-  orderId: integer("order_id").notNull().references(() => orders.id),
+  orderId: uuid("order_id").notNull().references(() => orders.id),
   customerId: integer("customer_id").notNull().references(() => users.id),
   merchantId: integer("merchant_id").notNull().references(() => users.id),
   driverId: integer("driver_id").references(() => users.id),
