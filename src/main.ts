@@ -14,6 +14,7 @@ import socialRoutes from './routes/social';
 import chatRoutes from './routes/chat';
 import analyticsRoutes from './routes/analytics';
 import paymentRoutes from './routes/payment';
+import commoditiesRoutes from './routes/commodities';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -58,6 +59,7 @@ app.use('/api/social', socialRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/payment', paymentRoutes);
+app.use('/api/commodities', commoditiesRoutes);
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
@@ -141,6 +143,13 @@ app.get('/api', (req, res) => {
         'POST /api/payment/verify': 'Verify payment transaction (authenticated)',
         'GET /api/payment/history': 'Get payment history (authenticated)',
       },
+      commodities: {
+        'GET /api/commodities': 'Get all commodities with filters (public)',
+        'GET /api/commodities/:id': 'Get single commodity (public)',
+        'POST /api/commodities': 'Create commodity (admin only)',
+        'PUT /api/commodities/:id': 'Update commodity (admin only)',
+        'DELETE /api/commodities/:id': 'Delete commodity (admin only)',
+      },
     },
     authentication: {
       type: 'Bearer Token',
@@ -151,6 +160,7 @@ app.get('/api', (req, res) => {
       CONSUMER: 'Regular users who can browse and purchase products',
       MERCHANT: 'Business users who can create and manage products',
       DRIVER: 'Delivery personnel who handle deliveries',
+      ADMIN: 'Super administrator with full control over the system',
     },
   });
 });
