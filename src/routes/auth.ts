@@ -2,9 +2,25 @@ import { Router } from 'express';
 import { eq, and } from 'drizzle-orm';
 import db from '../config/database';
 import { users, otpCodes, merchantProfiles, driverProfiles } from '../schema';
-import { hashPassword, comparePassword, generateToken, generateOTP } from '../utils/auth';
+import { hashPassword, comparePassword, generateToken, generateOTP, authenticateToken } from '../utils/auth';
 import { sendOTPEmail, sendWelcomeEmail } from '../utils/mailer';
 import { v4 as uuidv4 } from 'uuid';
+import { 
+  SignUpDto, 
+  SignInDto, 
+  ChangePasswordDto, 
+  ForgotPasswordDto, 
+  ResetPasswordDto, 
+  VerifyOtpDto 
+} from '../types/auth';
+import { 
+  validateSignUp, 
+  validateSignIn, 
+  validateChangePassword, 
+  validateForgotPassword, 
+  validateResetPassword, 
+  validateVerifyOtp 
+} from '../utils/validation';
 
 const router = Router();
 
@@ -50,7 +66,7 @@ router.post('/register', async (req, res) => {
 
     await db.insert(otpCodes).values({
       email,
-      code: otp,
+      code:otp,
       expiresAt,
     });
 
