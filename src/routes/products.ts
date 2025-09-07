@@ -120,7 +120,7 @@ router.get('/', async (req, res) => {
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .leftJoin(users, eq(products.sellerId, users.id))
       .where(and(...whereConditions))
-      .orderBy(sortOrder === 'desc' ? desc(products[sortBy as keyof typeof products]) : products[sortBy as keyof typeof products])
+      .orderBy(sortOrder === 'desc' ? desc(products.createdAt) : products.createdAt)
       .limit(Number(limit))
       .offset(offset);
 

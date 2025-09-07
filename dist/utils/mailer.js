@@ -1,24 +1,27 @@
-import nodemailer from 'nodemailer';
-
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.sendWelcomeEmail = exports.sendOTPEmail = void 0;
+const nodemailer_1 = __importDefault(require("nodemailer"));
 const EMAIL_SERVICE = process.env.EMAIL_SERVICE || 'gmail';
 const EMAIL_USER = process.env.EMAIL_USER || '';
 const EMAIL_PASS = process.env.EMAIL_PASS || '';
-
-const transporter = nodemailer.createTransport({
-  service: EMAIL_SERVICE,
-  auth: {
-    user: EMAIL_USER,
-    pass: EMAIL_PASS,
-  },
+const transporter = nodemailer_1.default.createTransport({
+    service: EMAIL_SERVICE,
+    auth: {
+        user: EMAIL_USER,
+        pass: EMAIL_PASS,
+    },
 });
-
-export const sendOTPEmail = async (email: string, otp: string): Promise<void> => {
-  try {
-    await transporter.sendMail({
-      from: EMAIL_USER,
-      to: email,
-      subject: 'Your BrillPrime OTP Code',
-      html: `
+const sendOTPEmail = async (email, otp) => {
+    try {
+        await transporter.sendMail({
+            from: EMAIL_USER,
+            to: email,
+            subject: 'Your BrillPrime OTP Code',
+            html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2>BrillPrime Verification Code</h2>
           <p>Your One-Time Password (OTP) is:</p>
@@ -29,20 +32,21 @@ export const sendOTPEmail = async (email: string, otp: string): Promise<void> =>
           <p>If you didn't request this code, please ignore this email.</p>
         </div>
       `,
-    });
-  } catch (error) {
-    console.error('Failed to send OTP email:', error);
-    throw new Error('Failed to send OTP email');
-  }
+        });
+    }
+    catch (error) {
+        console.error('Failed to send OTP email:', error);
+        throw new Error('Failed to send OTP email');
+    }
 };
-
-export const sendWelcomeEmail = async (email: string, fullName: string): Promise<void> => {
-  try {
-    await transporter.sendMail({
-      from: EMAIL_USER,
-      to: email,
-      subject: 'Welcome to BrillPrime!',
-      html: `
+exports.sendOTPEmail = sendOTPEmail;
+const sendWelcomeEmail = async (email, fullName) => {
+    try {
+        await transporter.sendMail({
+            from: EMAIL_USER,
+            to: email,
+            subject: 'Welcome to BrillPrime!',
+            html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2>Welcome to BrillPrime, ${fullName}!</h2>
           <p>Thank you for joining our platform. Your account has been successfully verified.</p>
@@ -57,8 +61,11 @@ export const sendWelcomeEmail = async (email: string, fullName: string): Promise
           <p>The BrillPrime Team</p>
         </div>
       `,
-    });
-  } catch (error) {
-    console.error('Failed to send welcome email:', error);
-  }
+        });
+    }
+    catch (error) {
+        console.error('Failed to send welcome email:', error);
+    }
 };
+exports.sendWelcomeEmail = sendWelcomeEmail;
+//# sourceMappingURL=mailer.js.map

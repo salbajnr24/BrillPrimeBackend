@@ -82,7 +82,7 @@ router.get('/my-orders', authenticateToken, async (req, res) => {
 
     let whereConditions = [eq(orders.buyerId, userId)];
     if (status) {
-      whereConditions.push(eq(orders.status, status as string));
+      whereConditions.push(eq(orders.status, status as any));
     }
 
     const userOrders = await db.select({
@@ -138,7 +138,7 @@ router.get('/merchant-orders', authenticateToken, async (req, res) => {
 
     let whereConditions = [eq(orders.sellerId, sellerId)];
     if (status) {
-      whereConditions.push(eq(orders.status, status as string));
+      whereConditions.push(eq(orders.status, status as any));
     }
 
     const merchantOrders = await db.select({
