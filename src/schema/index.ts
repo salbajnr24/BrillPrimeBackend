@@ -332,6 +332,18 @@ export const phoneVerifications = pgTable("phone_verifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// MFA (Multi-Factor Authentication) table
+export const mfaConfigurations = pgTable("mfa_configurations", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull().unique(),
+  isEnabled: boolean("is_enabled").default(false),
+  secret: text("secret").notNull(),
+  backupCodes: text("backup_codes").array(),
+  lastUsedAt: timestamp("last_used_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   products: many(products),
@@ -352,6 +364,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   identityVerifications: many(identityVerifications),
   driverVerifications: many(driverVerifications),
   phoneVerifications: many(phoneVerifications),
+  mfaConfiguration: one(mfaConfigurations),
 }));
 
 export const merchantNotificationsRelations = relations(merchantNotifications, ({ one }) => ({
@@ -373,6 +386,10 @@ export const driverVerificationsRelations = relations(driverVerifications, ({ on
 
 export const phoneVerificationsRelations = relations(phoneVerifications, ({ one }) => ({
   user: one(users, { fields: [phoneVerifications.userId], references: [users.id] }),
+}));
+
+export const mfaConfigurationsRelations = relations(mfaConfigurations, ({ one }) => ({
+  user: one(users, { fields: [mfaConfigurations.userId], references: [users.id] }),
 }));
 
 export const productsRelations = relations(products, ({ one, many }) => ({
@@ -477,6 +494,7 @@ export const insertSupportTicketSchema = createInsertSchema(supportTickets);
 export const insertIdentityVerificationSchema = createInsertSchema(identityVerifications);
 export const insertDriverVerificationSchema = createInsertSchema(driverVerifications);
 export const insertPhoneVerificationSchema = createInsertSchema(phoneVerifications);
+export const insertMfaConfigurationSchema = createInsertSchema(mfaConfigurations);
 export const insertReceiptSchema = createInsertSchema(receipts);
 
 export type User = typeof users.$inferSelect;
@@ -509,5 +527,7 @@ export type DriverVerification = typeof driverVerifications.$inferSelect;
 export type NewDriverVerification = typeof driverVerifications.$inferInsert;
 export type PhoneVerification = typeof phoneVerifications.$inferSelect;
 export type NewPhoneVerification = typeof phoneVerifications.$inferInsert;
+export type MfaConfiguration = typeof mfaConfigurations.$inferSelect;
+export type NewMfaConfiguration = typeof mfaConfigurations.$inferInsert;
 export type Receipt = typeof receipts.$inferSelect;
 export type NewReceipt = typeof receipts.$inferInsert;
