@@ -2,9 +2,10 @@
 import { Router } from 'express';
 import { eq, and, desc } from 'drizzle-orm';
 import db from '../config/database';
-import { orders, products, users, cartItems } from '../schema';
+import { orders, products, users, cartItems, receipts } from '../schema';
 import { authenticateToken } from '../utils/auth';
 import { v4 as uuidv4 } from 'uuid';
+import axios from 'axios';
 
 const router = Router();
 
@@ -460,6 +461,29 @@ router.patch('/verify-order', authenticateToken, async (req, res) => {
         })
         .where(eq(orders.id, pendingOrder.id))
         .returning();
+
+      // Generate receipt if payment was successful
+      if (paymentStatus === 'successful') {
+        try {
+          // Call receipt generation API internally
+          const receiptResponse = await axios.post('http://localhost:3000/api/receipts/generate', {
+            orderId: pendingOrder.id,
+            paymentMethod: 'card', // Default, can be updated based on actual payment method
+            transactionRef: txRef,
+          }, {
+            headers: {
+              'Authorization': `Bearer ${(req as any).token}`, // Pass the user's token
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          message += `. Receipt generated: ${receiptResponse.data.receipt.receiptNumber}`;
+        } catch (receiptError) {
+          console.error('Receipt generation failed:', receiptError);
+          // Don't fail the order verification if receipt generation fails
+          message += '. Note: Receipt generation pending.';
+        }
+      }
 
       res.json({
         status: 'Success',
