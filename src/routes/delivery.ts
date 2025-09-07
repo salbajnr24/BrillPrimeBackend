@@ -1,0 +1,348 @@
+import { Router } from 'express';
+import { eq, and, desc, sql } from 'drizzle-orm';
+import db from '../config/database';
+import { deliveryRequests, users, driverProfiles, orders } from '../schema';
+import { authenticateToken, authorizeRoles } from '../utils/auth';
+import { v4 as uuidv4 } from 'uuid';
+
+const router = Router();
+
+// Create delivery request
+router.post('/request', authenticateToken, async (req, res) => {
+  try {
+    const customerId = (req as any).user.userId;
+    const {
+      merchantId,
+      orderId,
+      deliveryType,
+      cargoValue,
+      requiresPremiumDriver,
+      pickupAddress,
+      deliveryAddress,
+      estimatedDistance,
+      estimatedDuration,
+      deliveryFee,
+      scheduledPickupTime,
+      specialInstructions,
+    } = req.body;
+
+    if (!deliveryType || !pickupAddress || !deliveryAddress || !deliveryFee) {
+      return res.status(400).json({ error: 'Required fields: deliveryType, pickupAddress, deliveryAddress, deliveryFee' });
+    }
+
+    // Generate tracking number
+    const trackingNumber = `BP-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+
+    const delivery = await db.insert(deliveryRequests).values({
+      customerId,
+      merchantId,
+      orderId,
+      deliveryType: deliveryType as any,
+      cargoValue: cargoValue?.toString() || '0',
+      requiresPremiumDriver: requiresPremiumDriver || false,
+      pickupAddress,
+      deliveryAddress,
+      estimatedDistance: estimatedDistance?.toString(),
+      estimatedDuration,
+      deliveryFee: deliveryFee.toString(),
+      scheduledPickupTime: scheduledPickupTime ? new Date(scheduledPickupTime) : null,
+      specialInstructions,
+      trackingNumber,
+    }).returning();
+
+    res.status(201).json({
+      message: 'Delivery request created successfully',
+      delivery: delivery[0],
+    });
+  } catch (error) {
+    console.error('Create delivery request error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get available delivery requests for drivers
+router.get('/available', authenticateToken, authorizeRoles('DRIVER'), async (req, res) => {
+  try {
+    const driverId = (req as any).user.userId;
+    const { deliveryType, maxDistance = 50 } = req.query;
+
+    // Get driver profile to check capabilities
+    const driverProfile = await db.select().from(driverProfiles).where(eq(driverProfiles.userId, driverId));
+    
+    if (driverProfile.length === 0) {
+      return res.status(400).json({ error: 'Driver profile not found. Please complete your profile first.' });
+    }
+
+    const driver = driverProfile[0];
+
+    let whereConditions = [eq(deliveryRequests.status, 'PENDING')];
+
+    // Filter by delivery type if driver has service type restrictions
+    if (deliveryType) {
+      whereConditions.push(eq(deliveryRequests.deliveryType, deliveryType as any));
+    }
+
+    // Filter by premium driver requirement
+    if (driver.driverTier === 'STANDARD') {
+      whereConditions.push(eq(deliveryRequests.requiresPremiumDriver, false));
+    }
+
+    const availableDeliveries = await db.select({
+      id: deliveryRequests.id,
+      deliveryType: deliveryRequests.deliveryType,
+      cargoValue: deliveryRequests.cargoValue,
+      requiresPremiumDriver: deliveryRequests.requiresPremiumDriver,
+      pickupAddress: deliveryRequests.pickupAddress,
+      deliveryAddress: deliveryRequests.deliveryAddress,
+      estimatedDistance: deliveryRequests.estimatedDistance,
+      estimatedDuration: deliveryRequests.estimatedDuration,
+      deliveryFee: deliveryRequests.deliveryFee,
+      scheduledPickupTime: deliveryRequests.scheduledPickupTime,
+      specialInstructions: deliveryRequests.specialInstructions,
+      trackingNumber: deliveryRequests.trackingNumber,
+      createdAt: deliveryRequests.createdAt,
+      customer: {
+        id: users.id,
+        fullName: users.fullName,
+        phone: users.phone,
+      },
+    })
+      .from(deliveryRequests)
+      .leftJoin(users, eq(deliveryRequests.customerId, users.id))
+      .where(and(...whereConditions))
+      .orderBy(desc(deliveryRequests.createdAt))
+      .limit(20);
+
+    res.json({
+      deliveries: availableDeliveries,
+      driverInfo: {
+        tier: driver.driverTier,
+        canHandlePremium: driver.driverTier === 'PREMIUM',
+        serviceTypes: driver.serviceTypes,
+        maxCargoValue: driver.maxCargoValue,
+      },
+    });
+  } catch (error) {
+    console.error('Get available deliveries error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Accept delivery request
+router.post('/:id/accept', authenticateToken, authorizeRoles('DRIVER'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const driverId = (req as any).user.userId;
+
+    // Check if delivery is still available
+    const delivery = await db.select().from(deliveryRequests).where(and(
+      eq(deliveryRequests.id, id),
+      eq(deliveryRequests.status, 'PENDING')
+    ));
+
+    if (delivery.length === 0) {
+      return res.status(404).json({ error: 'Delivery request not found or already assigned' });
+    }
+
+    // Check driver qualifications
+    const driverProfile = await db.select().from(driverProfiles).where(eq(driverProfiles.userId, driverId));
+    
+    if (driverProfile.length === 0) {
+      return res.status(400).json({ error: 'Driver profile not found' });
+    }
+
+    const driver = driverProfile[0];
+    const deliveryRequest = delivery[0];
+
+    // Check if delivery requires premium driver
+    if (deliveryRequest.requiresPremiumDriver && driver.driverTier !== 'PREMIUM') {
+      return res.status(403).json({ error: 'This delivery requires a premium driver' });
+    }
+
+    // Update delivery request
+    const updatedDelivery = await db.update(deliveryRequests)
+      .set({
+        driverId,
+        status: 'ASSIGNED',
+        updatedAt: new Date(),
+      })
+      .where(eq(deliveryRequests.id, id))
+      .returning();
+
+    res.json({
+      message: 'Delivery request accepted successfully',
+      delivery: updatedDelivery[0],
+    });
+  } catch (error) {
+    console.error('Accept delivery error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update delivery status
+router.put('/:id/status', authenticateToken, authorizeRoles('DRIVER'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const driverId = (req as any).user.userId;
+    const { status, actualPickupTime, actualDeliveryTime } = req.body;
+
+    const validStatuses = ['ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERED', 'CANCELLED'];
+    if (!status || !validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    // Check if delivery belongs to the driver
+    const existingDelivery = await db.select().from(deliveryRequests).where(and(
+      eq(deliveryRequests.id, id),
+      eq(deliveryRequests.driverId, driverId)
+    ));
+
+    if (existingDelivery.length === 0) {
+      return res.status(404).json({ error: 'Delivery not found or you are not assigned to it' });
+    }
+
+    const updateData: any = {
+      status: status as any,
+      updatedAt: new Date(),
+    };
+
+    if (actualPickupTime) {
+      updateData.actualPickupTime = new Date(actualPickupTime);
+    }
+
+    if (actualDeliveryTime) {
+      updateData.actualDeliveryTime = new Date(actualDeliveryTime);
+    }
+
+    const updatedDelivery = await db.update(deliveryRequests)
+      .set(updateData)
+      .where(eq(deliveryRequests.id, id))
+      .returning();
+
+    res.json({
+      message: 'Delivery status updated successfully',
+      delivery: updatedDelivery[0],
+    });
+  } catch (error) {
+    console.error('Update delivery status error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get driver's deliveries
+router.get('/my-deliveries', authenticateToken, authorizeRoles('DRIVER'), async (req, res) => {
+  try {
+    const driverId = (req as any).user.userId;
+    const { status, page = 1, limit = 10 } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
+
+    let whereConditions = [eq(deliveryRequests.driverId, driverId)];
+    if (status) {
+      whereConditions.push(eq(deliveryRequests.status, status as any));
+    }
+
+    const driverDeliveries = await db.select({
+      id: deliveryRequests.id,
+      deliveryType: deliveryRequests.deliveryType,
+      cargoValue: deliveryRequests.cargoValue,
+      pickupAddress: deliveryRequests.pickupAddress,
+      deliveryAddress: deliveryRequests.deliveryAddress,
+      estimatedDistance: deliveryRequests.estimatedDistance,
+      deliveryFee: deliveryRequests.deliveryFee,
+      status: deliveryRequests.status,
+      scheduledPickupTime: deliveryRequests.scheduledPickupTime,
+      actualPickupTime: deliveryRequests.actualPickupTime,
+      actualDeliveryTime: deliveryRequests.actualDeliveryTime,
+      trackingNumber: deliveryRequests.trackingNumber,
+      createdAt: deliveryRequests.createdAt,
+      customer: {
+        id: users.id,
+        fullName: users.fullName,
+        phone: users.phone,
+      },
+    })
+      .from(deliveryRequests)
+      .leftJoin(users, eq(deliveryRequests.customerId, users.id))
+      .where(and(...whereConditions))
+      .orderBy(desc(deliveryRequests.createdAt))
+      .limit(Number(limit))
+      .offset(offset);
+
+    res.json({
+      deliveries: driverDeliveries,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total: driverDeliveries.length,
+      },
+    });
+  } catch (error) {
+    console.error('Get driver deliveries error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Track delivery by tracking number (public)
+router.get('/track/:trackingNumber', async (req, res) => {
+  try {
+    const { trackingNumber } = req.params;
+
+    const delivery = await db.select({
+      id: deliveryRequests.id,
+      deliveryType: deliveryRequests.deliveryType,
+      pickupAddress: deliveryRequests.pickupAddress,
+      deliveryAddress: deliveryRequests.deliveryAddress,
+      status: deliveryRequests.status,
+      scheduledPickupTime: deliveryRequests.scheduledPickupTime,
+      actualPickupTime: deliveryRequests.actualPickupTime,
+      estimatedDeliveryTime: deliveryRequests.estimatedDeliveryTime,
+      actualDeliveryTime: deliveryRequests.actualDeliveryTime,
+      trackingNumber: deliveryRequests.trackingNumber,
+      createdAt: deliveryRequests.createdAt,
+      driver: {
+        id: users.id,
+        fullName: users.fullName,
+        phone: users.phone,
+      },
+    })
+      .from(deliveryRequests)
+      .leftJoin(users, eq(deliveryRequests.driverId, users.id))
+      .where(eq(deliveryRequests.trackingNumber, trackingNumber));
+
+    if (delivery.length === 0) {
+      return res.status(404).json({ error: 'Delivery not found' });
+    }
+
+    res.json(delivery[0]);
+  } catch (error) {
+    console.error('Track delivery error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get delivery statistics for drivers
+router.get('/stats', authenticateToken, authorizeRoles('DRIVER'), async (req, res) => {
+  try {
+    const driverId = (req as any).user.userId;
+
+    const stats = await db.select({
+      totalDeliveries: sql<number>`count(*)`.mapWith(Number),
+      completedDeliveries: sql<number>`count(*) filter (where status = 'DELIVERED')`.mapWith(Number),
+      totalEarnings: sql<string>`sum(${deliveryRequests.deliveryFee})`,
+    })
+      .from(deliveryRequests)
+      .where(eq(deliveryRequests.driverId, driverId));
+
+    const driverProfile = await db.select().from(driverProfiles).where(eq(driverProfiles.userId, driverId));
+
+    res.json({
+      stats: stats[0],
+      profile: driverProfile[0],
+    });
+  } catch (error) {
+    console.error('Get delivery stats error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+export default router;

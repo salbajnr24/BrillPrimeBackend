@@ -9,6 +9,10 @@ import userRoutes from './routes/users';
 import productRoutes from './routes/products';
 import cartRoutes from './routes/cart';
 import orderRoutes from './routes/orders';
+import deliveryRoutes from './routes/delivery';
+import socialRoutes from './routes/social';
+import chatRoutes from './routes/chat';
+import analyticsRoutes from './routes/analytics';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -48,6 +52,10 @@ app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/delivery', deliveryRoutes);
+app.use('/api/social', socialRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
@@ -92,6 +100,39 @@ app.get('/api', (req, res) => {
         'GET /api/orders/merchant-orders': 'Get merchant orders (merchant only)',
         'PUT /api/orders/:id/status': 'Update order status (merchant only)',
         'GET /api/orders/:id': 'Get order details (authenticated)',
+      },
+      delivery: {
+        'POST /api/delivery/request': 'Create delivery request (authenticated)',
+        'GET /api/delivery/available': 'Get available deliveries (driver only)',
+        'POST /api/delivery/:id/accept': 'Accept delivery request (driver only)',
+        'PUT /api/delivery/:id/status': 'Update delivery status (driver only)',
+        'GET /api/delivery/my-deliveries': 'Get driver deliveries (driver only)',
+        'GET /api/delivery/track/:trackingNumber': 'Track delivery (public)',
+        'GET /api/delivery/stats': 'Get delivery statistics (driver only)',
+      },
+      social: {
+        'POST /api/social/posts': 'Create vendor post (merchant only)',
+        'GET /api/social/posts': 'Get vendor posts feed (public)',
+        'GET /api/social/posts/:id': 'Get single post (public)',
+        'POST /api/social/posts/:id/like': 'Like/unlike post (authenticated)',
+        'POST /api/social/posts/:id/comments': 'Add comment to post (authenticated)',
+        'GET /api/social/posts/:id/comments': 'Get post comments (public)',
+        'PUT /api/social/posts/:id': 'Update post (post owner only)',
+        'DELETE /api/social/posts/:id': 'Delete post (post owner only)',
+      },
+      chat: {
+        'POST /api/chat/conversations': 'Start conversation (authenticated)',
+        'GET /api/chat/conversations': 'Get user conversations (authenticated)',
+        'POST /api/chat/conversations/:id/messages': 'Send message (authenticated)',
+        'GET /api/chat/conversations/:id/messages': 'Get conversation messages (authenticated)',
+        'GET /api/chat/conversations/:id': 'Get conversation details (authenticated)',
+        'PUT /api/chat/conversations/:id/close': 'Close conversation (authenticated)',
+      },
+      analytics: {
+        'GET /api/analytics/dashboard': 'Get merchant dashboard analytics (merchant only)',
+        'GET /api/analytics/sales': 'Get sales analytics (merchant only)',
+        'POST /api/analytics/record-daily': 'Record daily analytics (merchant only)',
+        'GET /api/analytics/profile': 'Get merchant profile analytics (merchant only)',
       },
     },
     authentication: {
