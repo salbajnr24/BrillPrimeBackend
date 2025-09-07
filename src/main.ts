@@ -13,6 +13,7 @@ import deliveryRoutes from './routes/delivery';
 import socialRoutes from './routes/social';
 import chatRoutes from './routes/chat';
 import analyticsRoutes from './routes/analytics';
+import paymentRoutes from './routes/payment';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -56,6 +57,7 @@ app.use('/api/delivery', deliveryRoutes);
 app.use('/api/social', socialRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/payment', paymentRoutes);
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
@@ -134,6 +136,11 @@ app.get('/api', (req, res) => {
         'POST /api/analytics/record-daily': 'Record daily analytics (merchant only)',
         'GET /api/analytics/profile': 'Get merchant profile analytics (merchant only)',
       },
+      payment: {
+        'POST /api/payment/initialize': 'Initialize payment transaction (authenticated)',
+        'POST /api/payment/verify': 'Verify payment transaction (authenticated)',
+        'GET /api/payment/history': 'Get payment history (authenticated)',
+      },
     },
     authentication: {
       type: 'Bearer Token',
@@ -160,7 +167,7 @@ app.use('*', (req, res) => {
 // Global error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Global error handler:', err);
-  
+
   res.status(err.status || 500).json({
     error: err.message || 'Internal server error',
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
