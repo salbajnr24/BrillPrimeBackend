@@ -241,6 +241,8 @@ export const deliveryRequests = pgTable("delivery_requests", {
   requiresPremiumDriver: boolean("requires_premium_driver").default(false),
   pickupAddress: text("pickup_address").notNull(),
   deliveryAddress: text("delivery_address").notNull(),
+  pickupLocation: json("pickup_location"),
+  deliveryLocation: json("delivery_location"),
   estimatedDistance: decimal("estimated_distance", { precision: 8, scale: 2 }),
   estimatedDuration: integer("estimated_duration"),
   deliveryFee: decimal("delivery_fee", { precision: 10, scale: 2 }).notNull(),
@@ -251,8 +253,83 @@ export const deliveryRequests = pgTable("delivery_requests", {
   actualDeliveryTime: timestamp("actual_delivery_time"),
   specialInstructions: text("special_instructions"),
   trackingNumber: text("tracking_number").unique(),
+  proofOfDelivery: text("proof_of_delivery"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Merchant Notifications
+export const merchantNotifications = pgTable("merchant_notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  merchantId: integer("merchant_id").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  type: text("type", { 
+    enum: ["ORDER", "PAYMENT", "DELIVERY", "PROMOTION", "SYSTEM", "REVIEW"] 
+  }).notNull(),
+  relatedId: uuid("related_id"),
+  isRead: boolean("is_read").default(false),
+  priority: text("priority", { enum: ["LOW", "MEDIUM", "HIGH", "URGENT"] }).default("MEDIUM"),
+  actionUrl: text("action_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  readAt: timestamp("read_at"),
+});
+
+// Support Tickets
+export const supportTickets = pgTable("support_tickets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  ticketNumber: text("ticket_number").notNull().unique(),
+  userId: integer("user_id").references(() => users.id),
+  userRole: text("user_role", { enum: ["CONSUMER", "MERCHANT", "DRIVER", "GUEST"] }).notNull(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  subject: text("subject").notNull(),
+  message: text("message").notNull(),
+  status: text("status", { enum: ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"] }).default("OPEN"),
+  priority: text("priority", { enum: ["LOW", "NORMAL", "HIGH", "URGENT"] }).default("NORMAL"),
+  assignedTo: integer("assigned_to").references(() => users.id),
+  adminNotes: text("admin_notes"),
+  resolution: text("resolution"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
+});
+
+// Identity Verification tables
+export const identityVerifications = pgTable("identity_verifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  verificationStatus: text("verification_status", { enum: ["PENDING", "APPROVED", "REJECTED"] }).default("PENDING"),
+  faceImageUrl: text("face_image_url"),
+  verificationDate: timestamp("verification_date"),
+  rejectionReason: text("rejection_reason"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const driverVerifications = pgTable("driver_verifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  licenseNumber: text("license_number").notNull(),
+  licenseExpiryDate: text("license_expiry_date").notNull(),
+  licenseImageUrl: text("license_image_url"),
+  vehicleType: text("vehicle_type").notNull(),
+  vehiclePlate: text("vehicle_plate").notNull(),
+  vehicleModel: text("vehicle_model"),
+  vehicleYear: text("vehicle_year"),
+  verificationStatus: text("verification_status", { enum: ["PENDING", "APPROVED", "REJECTED"] }).default("PENDING"),
+  verificationDate: timestamp("verification_date"),
+  rejectionReason: text("rejection_reason"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const phoneVerifications = pgTable("phone_verifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  phoneNumber: text("phone_number").notNull(),
+  otpCode: text("otp_code").notNull(),
+  isVerified: boolean("is_verified").default(false),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Relations
@@ -270,6 +347,32 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   customerConversations: many(conversations, { relationName: "customerConversations" }),
   vendorConversations: many(conversations, { relationName: "vendorConversations" }),
   deliveryRequests: many(deliveryRequests),
+  merchantNotifications: many(merchantNotifications),
+  supportTickets: many(supportTickets),
+  identityVerifications: many(identityVerifications),
+  driverVerifications: many(driverVerifications),
+  phoneVerifications: many(phoneVerifications),
+}));
+
+export const merchantNotificationsRelations = relations(merchantNotifications, ({ one }) => ({
+  merchant: one(users, { fields: [merchantNotifications.merchantId], references: [users.id] }),
+}));
+
+export const supportTicketsRelations = relations(supportTickets, ({ one }) => ({
+  user: one(users, { fields: [supportTickets.userId], references: [users.id] }),
+  assignedTo: one(users, { fields: [supportTickets.assignedTo], references: [users.id] }),
+}));
+
+export const identityVerificationsRelations = relations(identityVerifications, ({ one }) => ({
+  user: one(users, { fields: [identityVerifications.userId], references: [users.id] }),
+}));
+
+export const driverVerificationsRelations = relations(driverVerifications, ({ one }) => ({
+  user: one(users, { fields: [driverVerifications.userId], references: [users.id] }),
+}));
+
+export const phoneVerificationsRelations = relations(phoneVerifications, ({ one }) => ({
+  user: one(users, { fields: [phoneVerifications.userId], references: [users.id] }),
 }));
 
 export const productsRelations = relations(products, ({ one, many }) => ({
@@ -317,6 +420,11 @@ export const insertChatMessageSchema = createInsertSchema(chatMessages);
 export const insertMerchantProfileSchema = createInsertSchema(merchantProfiles);
 export const insertDriverProfileSchema = createInsertSchema(driverProfiles);
 export const insertDeliveryRequestSchema = createInsertSchema(deliveryRequests);
+export const insertMerchantNotificationSchema = createInsertSchema(merchantNotifications);
+export const insertSupportTicketSchema = createInsertSchema(supportTickets);
+export const insertIdentityVerificationSchema = createInsertSchema(identityVerifications);
+export const insertDriverVerificationSchema = createInsertSchema(driverVerifications);
+export const insertPhoneVerificationSchema = createInsertSchema(phoneVerifications);
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -338,3 +446,13 @@ export type DriverProfile = typeof driverProfiles.$inferSelect;
 export type NewDriverProfile = typeof driverProfiles.$inferInsert;
 export type DeliveryRequest = typeof deliveryRequests.$inferSelect;
 export type NewDeliveryRequest = typeof deliveryRequests.$inferInsert;
+export type MerchantNotification = typeof merchantNotifications.$inferSelect;
+export type NewMerchantNotification = typeof merchantNotifications.$inferInsert;
+export type SupportTicket = typeof supportTickets.$inferSelect;
+export type NewSupportTicket = typeof supportTickets.$inferInsert;
+export type IdentityVerification = typeof identityVerifications.$inferSelect;
+export type NewIdentityVerification = typeof identityVerifications.$inferInsert;
+export type DriverVerification = typeof driverVerifications.$inferSelect;
+export type NewDriverVerification = typeof driverVerifications.$inferInsert;
+export type PhoneVerification = typeof phoneVerifications.$inferSelect;
+export type NewPhoneVerification = typeof phoneVerifications.$inferInsert;
