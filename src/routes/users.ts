@@ -347,4 +347,200 @@ router.post('/location', authenticateToken, async (req, res) => {
   }
 });
 
+// Switch user role
+router.put('/role', authenticateToken, async (req, res) => {
+  try {
+    const userId = (req as any).user.userId;
+    const { role } = req.body;
+
+    // Validate role
+    const validRoles = ['CONSUMER', 'MERCHANT', 'DRIVER'];
+    if (!role || !validRoles.includes(role)) {
+      return res.status(400).json({ 
+        error: 'Invalid role. Must be one of: CONSUMER, MERCHANT, DRIVER' 
+      });
+    }
+
+    // Get current user to check existing role
+    const currentUser = await db.select().from(users).where(eq(users.id, userId));
+    
+    if (currentUser.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Update user role
+    const updatedUser = await db.update(users)
+      .set({ role: role as any })
+      .where(eq(users.id, userId))
+      .returning();
+
+    // Check if switching to MERCHANT and create profile if not exists
+    if (role === 'MERCHANT') {
+      const existingMerchantProfile = await db.select()
+        .from(merchantProfiles)
+        .where(eq(merchantProfiles.userId, userId));
+
+      if (existingMerchantProfile.length === 0) {
+        await db.insert(merchantProfiles).values({
+          userId,
+          businessName: updatedUser[0].fullName + "'s Business",
+          businessType: 'OTHER',
+          businessDescription: 'New merchant profile',
+        });
+      }
+    }
+
+    // Check if switching to DRIVER and create profile if not exists
+    if (role === 'DRIVER') {
+      const existingDriverProfile = await db.select()
+        .from(driverProfiles)
+        .where(eq(driverProfiles.userId, userId));
+
+      if (existingDriverProfile.length === 0) {
+        await db.insert(driverProfiles).values({
+          userId,
+          vehicleType: 'MOTORCYCLE',
+          vehiclePlate: 'PENDING',
+          driverLicense: 'PENDING',
+        });
+      }
+    }
+
+    res.json({
+      message: `Role switched to ${role} successfully`,
+      user: {
+        id: updatedUser[0].id,
+        userId: updatedUser[0].userId,
+        fullName: updatedUser[0].fullName,
+        email: updatedUser[0].email,
+        role: updatedUser[0].role,
+        previousRole: currentUser[0].role,
+      },
+    });
+  } catch (error) {
+    console.error('Switch role error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Public user search (minimal information)
+router.get('/search', async (req, res) => {
+  try {
+    const { q: query, type, page = 1, limit = 10 } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
+
+    if (!query || typeof query !== 'string' || query.trim().length < 2) {
+      return res.status(400).json({ 
+        error: 'Query parameter "q" is required and must be at least 2 characters' 
+      });
+    }
+
+    const searchTerm = `%${query.trim()}%`;
+    let whereConditions: any[] = [
+      eq(users.isVerified, true),
+    ];
+
+    // Add search conditions
+    whereConditions.push(
+      or(
+        like(users.fullName, searchTerm),
+        like(users.email, searchTerm)
+      )
+    );
+
+    // Filter by user type if specified
+    if (type && ['CONSUMER', 'MERCHANT', 'DRIVER'].includes(type as string)) {
+      whereConditions.push(eq(users.role, type as any));
+    }
+
+    // Base user query
+    let userQuery = db.select({
+      id: users.id,
+      userId: users.userId,
+      fullName: users.fullName,
+      email: users.email,
+      role: users.role,
+      profilePicture: users.profilePicture,
+      city: users.city,
+      state: users.state,
+      isVerified: users.isVerified,
+      createdAt: users.createdAt,
+    })
+      .from(users)
+      .where(and(...whereConditions))
+      .limit(Number(limit))
+      .offset(offset);
+
+    const searchResults = await userQuery;
+
+    // For merchants, get additional business info
+    const merchantIds = searchResults
+      .filter(user => user.role === 'MERCHANT')
+      .map(user => user.id);
+
+    let merchantProfiles = [];
+    if (merchantIds.length > 0) {
+      merchantProfiles = await db.select({
+        userId: merchantProfiles.userId,
+        businessName: merchantProfiles.businessName,
+        businessType: merchantProfiles.businessType,
+        rating: merchantProfiles.rating,
+        reviewCount: merchantProfiles.reviewCount,
+        isVerified: merchantProfiles.isVerified,
+      })
+        .from(merchantProfiles)
+        .where(and(
+          sql`${merchantProfiles.userId} IN (${merchantIds.join(',')})`,
+          like(merchantProfiles.businessName, searchTerm)
+        ));
+    }
+
+    // Combine results
+    const enhancedResults = searchResults.map(user => {
+      const result: any = {
+        id: user.id,
+        userId: user.userId,
+        fullName: user.fullName,
+        role: user.role,
+        profilePicture: user.profilePicture,
+        city: user.city,
+        state: user.state,
+        isVerified: user.isVerified,
+        createdAt: user.createdAt,
+      };
+
+      // Add merchant info if applicable
+      if (user.role === 'MERCHANT') {
+        const merchantProfile = merchantProfiles.find(mp => mp.userId === user.id);
+        if (merchantProfile) {
+          result.merchantInfo = {
+            businessName: merchantProfile.businessName,
+            businessType: merchantProfile.businessType,
+            rating: merchantProfile.rating,
+            reviewCount: merchantProfile.reviewCount,
+            isVerified: merchantProfile.isVerified,
+          };
+        }
+      }
+
+      return result;
+    });
+
+    res.json({
+      results: enhancedResults,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total: searchResults.length,
+        hasMore: searchResults.length === Number(limit),
+      },
+      searchQuery: query,
+      searchType: type || 'ALL',
+    });
+  } catch (error) {
+    console.error('User search error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;

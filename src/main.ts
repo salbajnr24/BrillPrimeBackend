@@ -92,6 +92,8 @@ app.get('/api', (req, res) => {
         'PUT /api/users/merchant-profile': 'Update merchant profile (merchant only)',
         'PUT /api/users/driver-profile': 'Update driver profile (driver only)',
         'POST /api/users/location': 'Update user location (authenticated)',
+        'PUT /api/users/role': 'Switch user role between CONSUMER, MERCHANT, DRIVER (authenticated)',
+        'GET /api/users/search': 'Search users publicly (query param: q, optional: type, page, limit)',
       },
       products: {
         'GET /api/products': 'Get all products with filters (public)',
