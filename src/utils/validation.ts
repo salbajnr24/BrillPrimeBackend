@@ -108,3 +108,41 @@ export const validateForgotPassword = (data: any): { isValid: boolean; errors: s
 
   return { isValid: errors.length === 0, errors };
 };
+
+export const validateAddToCart = (data: any): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+
+  if (!data.commodityId || typeof data.commodityId !== 'string') {
+    errors.push('Valid commodity ID is required');
+  }
+
+  if (!data.quantity || typeof data.quantity !== 'number' || data.quantity < 1) {
+    errors.push('Quantity must be a positive number greater than 0');
+  }
+
+  return { isValid: errors.length === 0, errors };
+};
+
+export const validateRemoveFromCart = (data: any): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+
+  if (!data.commodityId || typeof data.commodityId !== 'string') {
+    errors.push('Valid commodity ID is required');
+  }
+
+  return { isValid: errors.length === 0, errors };
+};
+
+export const validateUpdateCartItem = (data: any): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+
+  if (!data.cartItemId || typeof data.cartItemId !== 'string') {
+    errors.push('Valid cart item ID is required');
+  }
+
+  if (!data.quantity || typeof data.quantity !== 'number' || data.quantity < 1) {
+    errors.push('Quantity must be a positive number greater than 0');
+  }
+
+  return { isValid: errors.length === 0, errors };
+};
