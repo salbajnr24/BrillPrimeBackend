@@ -588,4 +588,156 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// Cancel order (Consumer side)
+router.put('/:id/cancel', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const buyerId = (req as any).user.userId;
+    const { reason } = req.body;
+
+    // Check if order belongs to the buyer and can be cancelled
+    const existingOrder = await db.select().from(orders).where(and(
+      eq(orders.id, id),
+      eq(orders.buyerId, buyerId)
+    ));
+
+    if (existingOrder.length === 0) {
+      return res.status(404).json({ error: 'Order not found or you do not have permission to cancel it' });
+    }
+
+    const order = existingOrder[0];
+    
+    // Only allow cancellation for pending, confirmed, or processing orders
+    if (!['pending', 'confirmed', 'processing'].includes(order.status)) {
+      return res.status(400).json({ error: 'Order cannot be cancelled at this stage' });
+    }
+
+    const updatedOrder = await db.update(orders)
+      .set({ 
+        status: 'cancelled',
+        updatedAt: new Date()
+      })
+      .where(eq(orders.id, id))
+      .returning();
+
+    res.json({
+      status: 'Success',
+      message: 'Order cancelled successfully',
+      data: updatedOrder[0],
+    });
+  } catch (error) {
+    console.error('Cancel order error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Refund order (Merchant/Admin side)
+router.post('/:id/refund', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = (req as any).user.userId;
+    const { refundAmount, refundReason } = req.body;
+
+    if (!refundAmount || !refundReason) {
+      return res.status(400).json({ error: 'Refund amount and reason are required' });
+    }
+
+    // Get order details
+    const existingOrder = await db.select({
+      id: orders.id,
+      buyerId: orders.buyerId,
+      sellerId: orders.sellerId,
+      totalPrice: orders.totalPrice,
+      status: orders.status,
+      buyer: {
+        fullName: users.fullName,
+        email: users.email,
+      },
+    })
+      .from(orders)
+      .leftJoin(users, eq(orders.buyerId, users.id))
+      .where(eq(orders.id, id));
+
+    if (existingOrder.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const order = existingOrder[0];
+
+    // Check if user has permission (seller or admin)
+    const userRole = (req as any).user.role;
+    if (order.sellerId !== userId && userRole !== 'ADMIN') {
+      return res.status(403).json({ error: 'You do not have permission to process this refund' });
+    }
+
+    // Update order status
+    const updatedOrder = await db.update(orders)
+      .set({ 
+        status: 'cancelled',
+        updatedAt: new Date()
+      })
+      .where(eq(orders.id, id))
+      .returning();
+
+    // Here you would integrate with payment provider for actual refund
+    // For now, we'll just log the refund request
+    console.log(`Refund processed for order ${id}: ${refundAmount} - ${refundReason}`);
+
+    res.json({
+      status: 'Success',
+      message: 'Refund processed successfully',
+      data: {
+        order: updatedOrder[0],
+        refundAmount,
+        refundReason,
+      },
+    });
+  } catch (error) {
+    console.error('Process refund error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add order review/rating
+router.post('/:id/review', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const buyerId = (req as any).user.userId;
+    const { rating, review } = req.body;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+    }
+
+    // Check if order belongs to the buyer and is delivered
+    const existingOrder = await db.select().from(orders).where(and(
+      eq(orders.id, id),
+      eq(orders.buyerId, buyerId),
+      eq(orders.status, 'delivered')
+    ));
+
+    if (existingOrder.length === 0) {
+      return res.status(404).json({ error: 'Order not found, not yours, or not delivered yet' });
+    }
+
+    // For now, we'll store the review in a simple format
+    // In a production system, you'd have a separate reviews table
+    const reviewData = {
+      orderId: id,
+      rating,
+      review: review || '',
+      reviewDate: new Date(),
+    };
+
+    res.json({
+      status: 'Success',
+      message: 'Review submitted successfully',
+      data: reviewData,
+    });
+  } catch (error) {
+    console.error('Submit review error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;

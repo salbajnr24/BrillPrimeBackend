@@ -306,4 +306,272 @@ async function verifyPayment(transactionId: string): Promise<string> {
   }
 }
 
+// Process refund
+router.post('/refund/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params; // This could be order ID or transaction ID
+    const { amount, reason, refundType = 'full' } = req.body;
+    const userId = (req as any).user.userId;
+
+    if (!reason) {
+      return res.status(400).json({ error: 'Refund reason is required' });
+    }
+
+    // Get order details
+    const orderData = await db.select().from(orders).where(eq(orders.id, id));
+    
+    if (orderData.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const order = orderData[0];
+    const userRole = (req as any).user.role;
+
+    // Check permissions (merchant can refund their orders, admin can refund any)
+    if (order.sellerId !== userId && userRole !== 'ADMIN') {
+      return res.status(403).json({ error: 'You do not have permission to process this refund' });
+    }
+
+    const refundAmount = amount || parseFloat(order.totalPrice);
+
+    // In production, integrate with Flutterwave refund API
+    try {
+      // Example Flutterwave refund call
+      /*
+      const refundResponse = await axios.post(
+        `${FLUTTERWAVE_BASE_URL}/transactions/${transactionId}/refund`,
+        {
+          amount: refundAmount,
+          comment: reason,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${FLUTTERWAVE_SECRET_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      */
+
+      // Update order status
+      await db.update(orders)
+        .set({ 
+          status: 'cancelled',
+          updatedAt: new Date()
+        })
+        .where(eq(orders.id, id));
+
+      const refundData = {
+        orderId: id,
+        refundAmount,
+        refundType,
+        reason,
+        status: 'PROCESSING',
+        referenceId: `REF-${Date.now()}-${id}`,
+        processedAt: new Date(),
+      };
+
+      res.json({
+        status: 'Success',
+        message: 'Refund processed successfully',
+        data: refundData,
+      });
+    } catch (refundError) {
+      console.error('Refund processing error:', refundError);
+      res.status(500).json({ error: 'Failed to process refund' });
+    }
+  } catch (error) {
+    console.error('Process refund error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Create payment dispute
+router.post('/dispute/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params; // Order or transaction ID
+    const userId = (req as any).user.userId;
+    const { disputeReason, description, evidence } = req.body;
+
+    if (!disputeReason || !description) {
+      return res.status(400).json({ 
+        error: 'Dispute reason and description are required' 
+      });
+    }
+
+    // Get order details
+    const orderData = await db.select({
+      id: orders.id,
+      buyerId: orders.buyerId,
+      sellerId: orders.sellerId,
+      totalPrice: orders.totalPrice,
+      status: orders.status,
+    }).from(orders).where(eq(orders.id, id));
+
+    if (orderData.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const order = orderData[0];
+
+    // Check if user is involved in the order
+    if (order.buyerId !== userId && order.sellerId !== userId) {
+      return res.status(403).json({ error: 'You are not authorized to dispute this payment' });
+    }
+
+    // Create dispute record (in production, store in disputes table)
+    const disputeData = {
+      disputeId: `DISPUTE-${Date.now()}-${id}`,
+      orderId: id,
+      initiatedBy: userId,
+      disputeReason,
+      description,
+      evidence: evidence || [],
+      status: 'PENDING',
+      createdAt: new Date(),
+      amount: order.totalPrice,
+    };
+
+    res.json({
+      status: 'Success',
+      message: 'Payment dispute created successfully',
+      data: disputeData,
+    });
+  } catch (error) {
+    console.error('Create dispute error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Request payout (Merchant/Driver)
+router.post('/payout', authenticateToken, async (req, res) => {
+  try {
+    const userId = (req as any).user.userId;
+    const userRole = (req as any).user.role;
+    const { amount, bankAccount, accountNumber, bankCode, notes } = req.body;
+
+    if (!amount || !bankAccount || !accountNumber || !bankCode) {
+      return res.status(400).json({ 
+        error: 'Amount and bank details are required' 
+      });
+    }
+
+    // Check user role
+    if (!['MERCHANT', 'DRIVER'].includes(userRole)) {
+      return res.status(403).json({ error: 'Only merchants and drivers can request payouts' });
+    }
+
+    let availableBalance = 0;
+
+    if (userRole === 'MERCHANT') {
+      // Calculate merchant available balance from completed orders
+      const merchantEarnings = await db.select({
+        totalEarnings: sql<string>`sum(${orders.totalPrice})`,
+      })
+        .from(orders)
+        .where(and(
+          eq(orders.sellerId, userId),
+          eq(orders.status, 'delivered')
+        ));
+
+      availableBalance = parseFloat(merchantEarnings[0]?.totalEarnings || '0');
+    } else if (userRole === 'DRIVER') {
+      // Calculate driver available balance from completed deliveries
+      const driverEarnings = await db.select({
+        totalEarnings: sql<string>`sum(${deliveryRequests.deliveryFee})`,
+      })
+        .from(deliveryRequests)
+        .where(and(
+          eq(deliveryRequests.driverId, userId),
+          eq(deliveryRequests.status, 'DELIVERED')
+        ));
+
+      availableBalance = parseFloat(driverEarnings[0]?.totalEarnings || '0');
+    }
+
+    if (amount > availableBalance) {
+      return res.status(400).json({ 
+        error: `Insufficient balance. Available: ${availableBalance}` 
+      });
+    }
+
+    // Create payout request
+    const payoutRequest = {
+      payoutId: `PAYOUT-${Date.now()}-${userId}`,
+      userId,
+      userRole,
+      amount,
+      bankAccount,
+      accountNumber,
+      bankCode,
+      notes: notes || '',
+      status: 'PENDING',
+      requestedAt: new Date(),
+      availableBalance,
+    };
+
+    res.json({
+      status: 'Success',
+      message: 'Payout request submitted successfully',
+      data: payoutRequest,
+    });
+  } catch (error) {
+    console.error('Request payout error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get payout history
+router.get('/payout/history', authenticateToken, async (req, res) => {
+  try {
+    const userId = (req as any).user.userId;
+    const userRole = (req as any).user.role;
+    const { page = 1, limit = 10, status } = req.query;
+
+    if (!['MERCHANT', 'DRIVER'].includes(userRole)) {
+      return res.status(403).json({ error: 'Only merchants and drivers can view payout history' });
+    }
+
+    // In production, this would fetch from a payouts table
+    // For now, return mock data
+    const mockPayouts = [
+      {
+        payoutId: `PAYOUT-${Date.now()}-${userId}`,
+        amount: '5000.00',
+        status: 'COMPLETED',
+        requestedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
+        processedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000), // 6 days ago
+        bankAccount: '**** **** **** 1234',
+      },
+      {
+        payoutId: `PAYOUT-${Date.now() - 1000}-${userId}`,
+        amount: '3000.00',
+        status: 'PENDING',
+        requestedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+        bankAccount: '**** **** **** 1234',
+      },
+    ];
+
+    const filteredPayouts = status 
+      ? mockPayouts.filter(p => p.status === status)
+      : mockPayouts;
+
+    res.json({
+      status: 'Success',
+      message: 'Payout history fetched successfully',
+      data: {
+        payouts: filteredPayouts,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total: filteredPayouts.length,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Get payout history error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;

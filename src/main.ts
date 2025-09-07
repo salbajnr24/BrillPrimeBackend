@@ -117,6 +117,9 @@ app.get('/api', (req, res) => {
         'GET /api/orders/my-orders': 'Get user orders (authenticated)',
         'GET /api/orders/merchant-orders': 'Get merchant orders (merchant only)',
         'PUT /api/orders/:id/status': 'Update order status (merchant only)',
+        'PUT /api/orders/:id/cancel': 'Cancel order (consumer only)',
+        'POST /api/orders/:id/refund': 'Process refund (merchant/admin only)',
+        'POST /api/orders/:id/review': 'Add order review (authenticated)',
         'GET /api/orders/:id': 'Get order details (authenticated)',
       },
       delivery: {
@@ -127,6 +130,10 @@ app.get('/api', (req, res) => {
         'GET /api/delivery/my-deliveries': 'Get driver deliveries (driver only)',
         'GET /api/delivery/track/:trackingNumber': 'Track delivery (public)',
         'GET /api/delivery/stats': 'Get delivery statistics (driver only)',
+        'GET /api/delivery/earnings': 'Get driver earnings (driver only)',
+        'POST /api/delivery/request-payout': 'Request payout (driver only)',
+        'GET /api/delivery/:id/route': 'Get delivery route (driver only)',
+        'POST /api/delivery/:id/review': 'Add delivery review (authenticated)',
       },
       social: {
         'POST /api/social/posts': 'Create vendor post (merchant only)',
@@ -155,6 +162,10 @@ app.get('/api', (req, res) => {
       payment: {
         'POST /api/payment/initialize': 'Initialize payment transaction (authenticated)',
         'POST /api/payment/verify': 'Verify payment transaction (authenticated)',
+        'POST /api/payment/refund/:id': 'Process payment refund (merchant/admin)',
+        'POST /api/payment/dispute/:id': 'Create payment dispute (authenticated)',
+        'POST /api/payment/payout': 'Request payout (merchant/driver)',
+        'GET /api/payment/payout/history': 'Get payout history (merchant/driver)',
         'GET /api/payment/history': 'Get payment history (authenticated)',
       },
       commodities: {

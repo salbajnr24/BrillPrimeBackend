@@ -541,4 +541,214 @@ router.get('/track/:trackingNumber', async (req, res) => {
   }
 });
 
+// Get driver earnings
+router.get('/earnings', authenticateToken, authorizeRoles('DRIVER'), async (req, res) => {
+  try {
+    const driverId = (req as any).user.userId;
+    const { startDate, endDate, page = 1, limit = 10 } = req.query;
+    
+    let whereConditions = [
+      eq(deliveryRequests.driverId, driverId),
+      eq(deliveryRequests.status, 'DELIVERED')
+    ];
+
+    if (startDate) {
+      whereConditions.push(sql`${deliveryRequests.actualDeliveryTime} >= ${new Date(startDate as string)}`);
+    }
+    if (endDate) {
+      whereConditions.push(sql`${deliveryRequests.actualDeliveryTime} <= ${new Date(endDate as string)}`);
+    }
+
+    // Get earnings summary
+    const earningsSummary = await db.select({
+      totalEarnings: sql<string>`sum(${deliveryRequests.deliveryFee})`,
+      totalDeliveries: sql<number>`count(*)`.mapWith(Number),
+      averageEarningPerDelivery: sql<string>`avg(${deliveryRequests.deliveryFee})`,
+    })
+      .from(deliveryRequests)
+      .where(and(...whereConditions));
+
+    // Get detailed earnings
+    const offset = (Number(page) - 1) * Number(limit);
+    const detailedEarnings = await db.select({
+      id: deliveryRequests.id,
+      deliveryFee: deliveryRequests.deliveryFee,
+      deliveryType: deliveryRequests.deliveryType,
+      trackingNumber: deliveryRequests.trackingNumber,
+      actualDeliveryTime: deliveryRequests.actualDeliveryTime,
+      customer: {
+        fullName: users.fullName,
+      },
+    })
+      .from(deliveryRequests)
+      .leftJoin(users, eq(deliveryRequests.customerId, users.id))
+      .where(and(...whereConditions))
+      .orderBy(desc(deliveryRequests.actualDeliveryTime))
+      .limit(Number(limit))
+      .offset(offset);
+
+    res.json({
+      status: 'Success',
+      message: 'Earnings fetched successfully',
+      data: {
+        summary: earningsSummary[0],
+        earnings: detailedEarnings,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Get driver earnings error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Request payout
+router.post('/request-payout', authenticateToken, authorizeRoles('DRIVER'), async (req, res) => {
+  try {
+    const driverId = (req as any).user.userId;
+    const { amount, bankAccount, accountNumber, bankCode } = req.body;
+
+    if (!amount || !bankAccount || !accountNumber || !bankCode) {
+      return res.status(400).json({ 
+        error: 'Amount, bank account details are required' 
+      });
+    }
+
+    // Get driver's available balance
+    const availableEarnings = await db.select({
+      totalEarnings: sql<string>`sum(${deliveryRequests.deliveryFee})`,
+    })
+      .from(deliveryRequests)
+      .where(and(
+        eq(deliveryRequests.driverId, driverId),
+        eq(deliveryRequests.status, 'DELIVERED')
+      ));
+
+    const totalEarnings = parseFloat(availableEarnings[0]?.totalEarnings || '0');
+
+    if (amount > totalEarnings) {
+      return res.status(400).json({ 
+        error: `Insufficient balance. Available: ${totalEarnings}` 
+      });
+    }
+
+    // Create payout request (In production, this would be stored in a payouts table)
+    const payoutRequest = {
+      driverId,
+      amount,
+      bankAccount,
+      accountNumber,
+      bankCode,
+      status: 'PENDING',
+      requestedAt: new Date(),
+      referenceId: `PAYOUT-${Date.now()}-${driverId}`,
+    };
+
+    res.json({
+      status: 'Success',
+      message: 'Payout request submitted successfully',
+      data: payoutRequest,
+    });
+  } catch (error) {
+    console.error('Request payout error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get delivery route (basic implementation)
+router.get('/:id/route', authenticateToken, authorizeRoles('DRIVER'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const driverId = (req as any).user.userId;
+
+    // Get delivery details
+    const delivery = await db.select().from(deliveryRequests).where(and(
+      eq(deliveryRequests.id, id),
+      eq(deliveryRequests.driverId, driverId)
+    ));
+
+    if (delivery.length === 0) {
+      return res.status(404).json({ error: 'Delivery not found or not assigned to you' });
+    }
+
+    const deliveryData = delivery[0];
+
+    // Basic route information (in production, integrate with Google Maps/Mapbox)
+    const routeInfo = {
+      deliveryId: id,
+      pickupAddress: deliveryData.pickupAddress,
+      deliveryAddress: deliveryData.deliveryAddress,
+      estimatedDistance: deliveryData.estimatedDistance,
+      estimatedDuration: deliveryData.estimatedDuration,
+      currentLocation: deliveryData.currentLatitude && deliveryData.currentLongitude ? {
+        latitude: parseFloat(deliveryData.currentLatitude),
+        longitude: parseFloat(deliveryData.currentLongitude),
+      } : null,
+      optimizedRoute: [
+        { step: 1, instruction: `Head to pickup location: ${deliveryData.pickupAddress}` },
+        { step: 2, instruction: `Collect package` },
+        { step: 3, instruction: `Navigate to delivery location: ${deliveryData.deliveryAddress}` },
+        { step: 4, instruction: `Complete delivery` },
+      ],
+    };
+
+    res.json({
+      status: 'Success',
+      message: 'Route information fetched successfully',
+      data: routeInfo,
+    });
+  } catch (error) {
+    console.error('Get delivery route error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add delivery review/feedback (Consumer side)
+router.post('/:id/review', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const customerId = (req as any).user.userId;
+    const { rating, feedback, driverRating } = req.body;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+    }
+
+    // Check if delivery belongs to the customer and is delivered
+    const existingDelivery = await db.select().from(deliveryRequests).where(and(
+      eq(deliveryRequests.id, id),
+      eq(deliveryRequests.customerId, customerId),
+      eq(deliveryRequests.status, 'DELIVERED')
+    ));
+
+    if (existingDelivery.length === 0) {
+      return res.status(404).json({ 
+        error: 'Delivery not found, not yours, or not completed yet' 
+      });
+    }
+
+    // Store review (in production, you'd have a separate delivery_reviews table)
+    const reviewData = {
+      deliveryId: id,
+      customerId,
+      deliveryRating: rating,
+      driverRating: driverRating || rating,
+      feedback: feedback || '',
+      reviewDate: new Date(),
+    };
+
+    res.json({
+      status: 'Success',
+      message: 'Delivery review submitted successfully',
+      data: reviewData,
+    });
+  } catch (error) {
+    console.error('Submit delivery review error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;
