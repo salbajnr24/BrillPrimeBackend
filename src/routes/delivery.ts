@@ -345,4 +345,200 @@ router.get('/stats', authenticateToken, authorizeRoles('DRIVER'), async (req, re
   }
 });
 
+// Update delivery location (for drivers)
+router.put('/:id/location', authenticateToken, authorizeRoles('DRIVER'), async (req, res) => {
+  try {
+    const deliveryId = req.params.id;
+    const driverId = (req as any).user.userId;
+    const { latitude, longitude, address } = req.body;
+
+    if (!latitude || !longitude) {
+      return res.status(400).json({ error: 'Latitude and longitude are required' });
+    }
+
+    // Verify this driver is assigned to the delivery
+    const delivery = await db.select()
+      .from(deliveryRequests)
+      .where(and(
+        eq(deliveryRequests.id, Number(deliveryId)),
+        eq(deliveryRequests.driverId, driverId)
+      ));
+
+    if (delivery.length === 0) {
+      return res.status(404).json({ error: 'Delivery not found or not assigned to you' });
+    }
+
+    // Update delivery with current location
+    const updatedDelivery = await db.update(deliveryRequests)
+      .set({
+        currentLatitude: latitude.toString(),
+        currentLongitude: longitude.toString(),
+        currentAddress: address || null,
+        updatedAt: new Date(),
+      })
+      .where(eq(deliveryRequests.id, Number(deliveryId)))
+      .returning();
+
+    res.json({
+      message: 'Location updated successfully',
+      delivery: updatedDelivery[0],
+    });
+  } catch (error) {
+    console.error('Update delivery location error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Mark delivery as picked up
+router.put('/:id/pickup', authenticateToken, authorizeRoles('DRIVER'), async (req, res) => {
+  try {
+    const deliveryId = req.params.id;
+    const driverId = (req as any).user.userId;
+    const { pickupPhotoUrl, notes } = req.body;
+
+    // Verify this driver is assigned to the delivery
+    const delivery = await db.select()
+      .from(deliveryRequests)
+      .where(and(
+        eq(deliveryRequests.id, Number(deliveryId)),
+        eq(deliveryRequests.driverId, driverId),
+        eq(deliveryRequests.status, 'ASSIGNED')
+      ));
+
+    if (delivery.length === 0) {
+      return res.status(404).json({ error: 'Delivery not found, not assigned to you, or not in correct status' });
+    }
+
+    // Update delivery status to picked up
+    const updatedDelivery = await db.update(deliveryRequests)
+      .set({
+        status: 'PICKED_UP',
+        pickupTime: new Date(),
+        pickupPhotoUrl,
+        pickupNotes: notes,
+        updatedAt: new Date(),
+      })
+      .where(eq(deliveryRequests.id, Number(deliveryId)))
+      .returning();
+
+    res.json({
+      message: 'Delivery marked as picked up',
+      delivery: updatedDelivery[0],
+    });
+  } catch (error) {
+    console.error('Mark delivery pickup error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Mark delivery as delivered
+router.put('/:id/deliver', authenticateToken, authorizeRoles('DRIVER'), async (req, res) => {
+  try {
+    const deliveryId = req.params.id;
+    const driverId = (req as any).user.userId;
+    const { deliveryPhotoUrl, recipientName, recipientSignature, notes } = req.body;
+
+    // Verify this driver is assigned to the delivery
+    const delivery = await db.select()
+      .from(deliveryRequests)
+      .where(and(
+        eq(deliveryRequests.id, Number(deliveryId)),
+        eq(deliveryRequests.driverId, driverId),
+        eq(deliveryRequests.status, 'PICKED_UP')
+      ));
+
+    if (delivery.length === 0) {
+      return res.status(404).json({ error: 'Delivery not found, not assigned to you, or not picked up yet' });
+    }
+
+    // Update delivery status to delivered
+    const updatedDelivery = await db.update(deliveryRequests)
+      .set({
+        status: 'DELIVERED',
+        deliveryTime: new Date(),
+        deliveryPhotoUrl,
+        recipientName,
+        recipientSignature,
+        deliveryNotes: notes,
+        updatedAt: new Date(),
+      })
+      .where(eq(deliveryRequests.id, Number(deliveryId)))
+      .returning();
+
+    // Update associated order status if linked
+    if (delivery[0].orderId) {
+      await db.update(orders)
+        .set({ status: 'delivered' })
+        .where(eq(orders.id, Number(delivery[0].orderId)));
+    }
+
+    res.json({
+      message: 'Delivery completed successfully',
+      delivery: updatedDelivery[0],
+    });
+  } catch (error) {
+    console.error('Mark delivery completed error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get delivery tracking information (public)
+router.get('/track/:trackingNumber', async (req, res) => {
+  try {
+    const { trackingNumber } = req.params;
+
+    const delivery = await db.select({
+      delivery: deliveryRequests,
+      driver: {
+        id: users.id,
+        fullName: users.fullName,
+        phone: users.phone,
+        profilePicture: users.profilePicture,
+      },
+    })
+      .from(deliveryRequests)
+      .leftJoin(users, eq(deliveryRequests.driverId, users.id))
+      .where(eq(deliveryRequests.trackingNumber, trackingNumber));
+
+    if (delivery.length === 0) {
+      return res.status(404).json({ error: 'Tracking number not found' });
+    }
+
+    const deliveryData = delivery[0];
+
+    res.json({
+      trackingNumber: deliveryData.delivery.trackingNumber,
+      status: deliveryData.delivery.status,
+      deliveryType: deliveryData.delivery.deliveryType,
+      pickupAddress: deliveryData.delivery.pickupAddress,
+      deliveryAddress: deliveryData.delivery.deliveryAddress,
+      estimatedDuration: deliveryData.delivery.estimatedDuration,
+      currentLocation: deliveryData.delivery.currentLatitude && deliveryData.delivery.currentLongitude ? {
+        latitude: parseFloat(deliveryData.delivery.currentLatitude),
+        longitude: parseFloat(deliveryData.delivery.currentLongitude),
+        address: deliveryData.delivery.currentAddress,
+      } : null,
+      driver: deliveryData.driver ? {
+        name: deliveryData.driver.fullName,
+        phone: deliveryData.driver.phone,
+        profilePicture: deliveryData.driver.profilePicture,
+      } : null,
+      timeline: {
+        createdAt: deliveryData.delivery.createdAt,
+        assignedAt: deliveryData.delivery.assignedAt,
+        pickupTime: deliveryData.delivery.pickupTime,
+        deliveryTime: deliveryData.delivery.deliveryTime,
+      },
+      proofOfDelivery: deliveryData.delivery.status === 'DELIVERED' ? {
+        deliveryPhotoUrl: deliveryData.delivery.deliveryPhotoUrl,
+        recipientName: deliveryData.delivery.recipientName,
+        deliveryNotes: deliveryData.delivery.deliveryNotes,
+      } : null,
+    });
+  } catch (error) {
+    console.error('Track delivery error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;
