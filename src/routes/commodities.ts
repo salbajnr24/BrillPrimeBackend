@@ -4,6 +4,8 @@ import { eq, and, like, desc, sql } from 'drizzle-orm';
 import db from '../config/database';
 import { products, categories, users } from '../schema';
 import { authenticateToken, authorizeRoles } from '../utils/auth';
+import { validateAddCommodity, validateUpdateCommodity } from '../utils/validation';
+import { AddCommodityDto, UpdateCommodityDto } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
@@ -69,10 +71,27 @@ router.get('/subcategories', async (req, res) => {
 router.post('/add', authenticateToken, authorizeRoles('MERCHANT'), async (req, res) => {
   try {
     const vendorId = (req as any).user.userId;
-    const { name, description, price, unit, categoryId, image, minimumOrder } = req.body;
+    const { name, description, price, unit, categoryId, image, minimumOrder, quantity, imageUrl } = req.body;
 
-    if (!name || !description || !price || !unit || !categoryId) {
-      return res.status(400).json({ error: 'Name, description, price, unit, and categoryId are required' });
+    // Validate the request data
+    const validation = validateAddCommodity({ 
+      name, 
+      description, 
+      price, 
+      unit, 
+      quantity: quantity || 1,
+      imageUrl: image || imageUrl 
+    });
+    
+    if (!validation.isValid) {
+      return res.status(400).json({ 
+        error: 'Validation failed', 
+        details: validation.errors 
+      });
+    }
+
+    if (!categoryId) {
+      return res.status(400).json({ error: 'CategoryId is required' });
     }
 
     // Verify category exists
@@ -108,7 +127,24 @@ router.post('/update/:id', authenticateToken, authorizeRoles('MERCHANT'), async 
   try {
     const { id } = req.params;
     const vendorId = (req as any).user.userId;
-    const { name, description, price, unit, categoryId, image, minimumOrder, inStock } = req.body;
+    const { name, description, price, unit, categoryId, image, minimumOrder, inStock, quantity, imageUrl } = req.body;
+
+    // Validate the request data
+    const validation = validateUpdateCommodity({ 
+      name, 
+      description, 
+      price, 
+      unit, 
+      quantity,
+      imageUrl: image || imageUrl 
+    });
+    
+    if (!validation.isValid) {
+      return res.status(400).json({ 
+        error: 'Validation failed', 
+        details: validation.errors 
+      });
+    }
 
     // Check if commodity exists and belongs to the vendor
     const existingCommodity = await db.select().from(products).where(and(

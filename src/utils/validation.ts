@@ -1,4 +1,3 @@
-
 export const validateEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
@@ -142,6 +141,70 @@ export const validateUpdateCartItem = (data: any): { isValid: boolean; errors: s
 
   if (!data.quantity || typeof data.quantity !== 'number' || data.quantity < 1) {
     errors.push('Quantity must be a positive number greater than 0');
+  }
+
+  return { isValid: errors.length === 0, errors };
+};
+
+export const validateAddCommodity = (data: any): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+
+  if (!data.name || typeof data.name !== 'string' || data.name.trim().length === 0) {
+    errors.push('Name is required and must be a valid string');
+  }
+
+  if (!data.price || typeof data.price !== 'string' || data.price.trim().length === 0) {
+    errors.push('Price is required and must be a valid string');
+  }
+
+  if (!data.description || typeof data.description !== 'string' || data.description.trim().length === 0) {
+    errors.push('Description is required and must be a valid string');
+  }
+
+  if (!data.unit || typeof data.unit !== 'string' || data.unit.trim().length === 0) {
+    errors.push('Unit is required and must be a valid string');
+  }
+
+  if (!data.quantity || typeof data.quantity !== 'number' || data.quantity < 1) {
+    errors.push('Quantity must be a positive number greater than 0');
+  }
+
+  if (data.imageUrl && typeof data.imageUrl !== 'string') {
+    errors.push('Image URL must be a valid string if provided');
+  }
+
+  if (data.category && typeof data.category !== 'string') {
+    errors.push('Category must be a valid string if provided');
+  }
+
+  return { isValid: errors.length === 0, errors };
+};
+
+export const validateUpdateCommodity = (data: any): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+
+  if (data.name !== undefined && (typeof data.name !== 'string' || data.name.trim().length === 0)) {
+    errors.push('Name must be a valid string if provided');
+  }
+
+  if (data.price !== undefined && (typeof data.price !== 'string' || data.price.trim().length === 0)) {
+    errors.push('Price must be a valid string if provided');
+  }
+
+  if (data.description !== undefined && (typeof data.description !== 'string' || data.description.trim().length === 0)) {
+    errors.push('Description must be a valid string if provided');
+  }
+
+  if (data.quantity !== undefined && (typeof data.quantity !== 'number' || data.quantity < 1)) {
+    errors.push('Quantity must be a positive number greater than 0 if provided');
+  }
+
+  if (data.imageUrl !== undefined && typeof data.imageUrl !== 'string') {
+    errors.push('Image URL must be a valid string if provided');
+  }
+
+  if (data.category !== undefined && typeof data.category !== 'string') {
+    errors.push('Category must be a valid string if provided');
   }
 
   return { isValid: errors.length === 0, errors };
