@@ -20,6 +20,7 @@ import supportRoutes from './routes/support';
 import verificationRoutes from './routes/verification';
 import uploadRoutes from './routes/upload';
 import adminRoutes from './routes/admin';
+import receiptsRoutes from './routes/receipts';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -70,6 +71,7 @@ app.use('/api/support', supportRoutes);
 app.use('/api/verification', verificationRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/receipts', receiptsRoutes);
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
@@ -203,6 +205,12 @@ app.get('/api', (req, res) => {
         'GET /api/admin/drivers/verification-requests': 'Get pending driver verifications (admin only)',
         'PUT /api/admin/users/:id/status': 'Suspend or activate user account (admin only)',
         'GET /api/admin/system/health': 'Get system health metrics (admin only)',
+      },
+      receipts: {
+        'POST /api/receipts/generate': 'Generate receipt and QR code for completed order (authenticated)',
+        'GET /api/receipts/:receiptNumber': 'Get receipt details by receipt number (public)',
+        'GET /api/receipts/user/all': 'Get user\'s receipts (authenticated)',
+        'POST /api/receipts/scan': 'Scan QR code for verification (authenticated)',
       },
     },
     authentication: {
