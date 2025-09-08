@@ -240,18 +240,18 @@ router.get('/merchants', async (req, res) => {
       .where(and(...whereConditions))
       .having(
         sql`6371 * acos(cos(radians(${Number(latitude)})) * cos(radians(CAST(${users.latitude} AS DECIMAL))) * cos(radians(CAST(${users.longitude} AS DECIMAL)) - radians(${Number(longitude)})) + sin(radians(${Number(latitude)})) * sin(radians(CAST(${users.latitude} AS DECIMAL)))) <= ${Number(radius)}`
-      );
+      ) as any;
 
     // Sorting
     switch (sortBy) {
       case 'rating':
-        merchantQuery = merchantQuery.orderBy(desc(sql`CAST(${merchantProfiles.rating} AS DECIMAL)`));
+        merchantQuery = (merchantQuery as any).orderBy(desc(sql`CAST(${merchantProfiles.rating} AS DECIMAL)`));
         break;
       case 'name':
-        merchantQuery = merchantQuery.orderBy(asc(merchantProfiles.businessName));
+        merchantQuery = (merchantQuery as any).orderBy(asc(merchantProfiles.businessName));
         break;
       default: // distance
-        merchantQuery = merchantQuery.orderBy(asc(sql`6371 * acos(cos(radians(${Number(latitude)})) * cos(radians(CAST(${users.latitude} AS DECIMAL))) * cos(radians(CAST(${users.longitude} AS DECIMAL)) - radians(${Number(longitude)})) + sin(radians(${Number(latitude)})) * sin(radians(CAST(${users.latitude} AS DECIMAL))))`));
+        merchantQuery = (merchantQuery as any).orderBy(asc(sql`6371 * acos(cos(radians(${Number(latitude)})) * cos(radians(CAST(${users.latitude} AS DECIMAL))) * cos(radians(CAST(${users.longitude} AS DECIMAL)) - radians(${Number(longitude)})) + sin(radians(${Number(latitude)})) * sin(radians(CAST(${users.latitude} AS DECIMAL))))`));
     }
 
     const nearbyMerchants = await merchantQuery.limit(Number(limit)).offset(offset);

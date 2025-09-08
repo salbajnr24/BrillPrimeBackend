@@ -111,6 +111,30 @@ export declare const users: import("drizzle-orm/pg-core").PgTableWithColumns<{
             enumValues: undefined;
             baseColumn: never;
         }, {}, {}>;
+        isPhoneVerified: import("drizzle-orm/pg-core").PgColumn<{
+            name: "is_phone_verified";
+            tableName: "users";
+            dataType: "boolean";
+            columnType: "PgBoolean";
+            data: boolean;
+            driverParam: boolean;
+            notNull: false;
+            hasDefault: true;
+            enumValues: undefined;
+            baseColumn: never;
+        }, {}, {}>;
+        isIdentityVerified: import("drizzle-orm/pg-core").PgColumn<{
+            name: "is_identity_verified";
+            tableName: "users";
+            dataType: "boolean";
+            columnType: "PgBoolean";
+            data: boolean;
+            driverParam: boolean;
+            notNull: false;
+            hasDefault: true;
+            enumValues: undefined;
+            baseColumn: never;
+        }, {}, {}>;
         isActive: import("drizzle-orm/pg-core").PgColumn<{
             name: "is_active";
             tableName: "users";
@@ -787,11 +811,23 @@ export declare const orders: import("drizzle-orm/pg-core").PgTableWithColumns<{
             tableName: "orders";
             dataType: "string";
             columnType: "PgText";
-            data: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
+            data: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled" | "failed";
             driverParam: string;
             notNull: false;
             hasDefault: true;
-            enumValues: ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"];
+            enumValues: ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled", "failed"];
+            baseColumn: never;
+        }, {}, {}>;
+        paymentTxRef: import("drizzle-orm/pg-core").PgColumn<{
+            name: "payment_tx_ref";
+            tableName: "orders";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            enumValues: [string, ...string[]];
             baseColumn: never;
         }, {}, {}>;
         deliveryAddress: import("drizzle-orm/pg-core").PgColumn<{
@@ -5811,6 +5847,8 @@ export declare const insertUserSchema: z.ZodObject<{
     password: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     profilePicture: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     isVerified: z.ZodOptional<z.ZodNullable<z.ZodBoolean>>;
+    isPhoneVerified: z.ZodOptional<z.ZodNullable<z.ZodBoolean>>;
+    isIdentityVerified: z.ZodOptional<z.ZodNullable<z.ZodBoolean>>;
     isActive: z.ZodOptional<z.ZodNullable<z.ZodBoolean>>;
     city: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     state: z.ZodOptional<z.ZodNullable<z.ZodString>>;
@@ -5880,6 +5918,8 @@ export declare const insertUserSchema: z.ZodObject<{
     password?: string | null | undefined;
     profilePicture?: string | null | undefined;
     isVerified?: boolean | null | undefined;
+    isPhoneVerified?: boolean | null | undefined;
+    isIdentityVerified?: boolean | null | undefined;
     isActive?: boolean | null | undefined;
     city?: string | null | undefined;
     state?: string | null | undefined;
@@ -5925,6 +5965,8 @@ export declare const insertUserSchema: z.ZodObject<{
     password?: string | null | undefined;
     profilePicture?: string | null | undefined;
     isVerified?: boolean | null | undefined;
+    isPhoneVerified?: boolean | null | undefined;
+    isIdentityVerified?: boolean | null | undefined;
     isActive?: boolean | null | undefined;
     city?: string | null | undefined;
     state?: string | null | undefined;
@@ -6019,7 +6061,8 @@ export declare const insertOrderSchema: z.ZodObject<{
     productId: z.ZodString;
     quantity: z.ZodNumber;
     totalPrice: z.ZodString;
-    status: z.ZodOptional<z.ZodNullable<z.ZodEnum<["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"]>>>;
+    status: z.ZodOptional<z.ZodNullable<z.ZodEnum<["pending", "confirmed", "processing", "shipped", "delivered", "cancelled", "failed"]>>>;
+    paymentTxRef: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     deliveryAddress: z.ZodString;
     driverId: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
 }, z.UnknownKeysParam, z.ZodTypeAny, {
@@ -6032,7 +6075,8 @@ export declare const insertOrderSchema: z.ZodObject<{
     id?: string | undefined;
     createdAt?: Date | null | undefined;
     updatedAt?: Date | null | undefined;
-    status?: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled" | null | undefined;
+    status?: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled" | "failed" | null | undefined;
+    paymentTxRef?: string | null | undefined;
     driverId?: number | null | undefined;
 }, {
     sellerId: number;
@@ -6044,7 +6088,8 @@ export declare const insertOrderSchema: z.ZodObject<{
     id?: string | undefined;
     createdAt?: Date | null | undefined;
     updatedAt?: Date | null | undefined;
-    status?: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled" | null | undefined;
+    status?: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled" | "failed" | null | undefined;
+    paymentTxRef?: string | null | undefined;
     driverId?: number | null | undefined;
 }>;
 export declare const insertCartItemSchema: z.ZodObject<{
