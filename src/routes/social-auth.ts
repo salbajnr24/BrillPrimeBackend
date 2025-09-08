@@ -11,12 +11,13 @@ import { sendWelcomeEmail } from '../utils/mailer';
 
 const router = Router();
 
-// Configure Google OAuth Strategy
-passport.use(new GoogleStrategy({
-  clientID: process.env.GOOGLE_CLIENT_ID || '',
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-  callbackURL: "/api/social-auth/google/callback"
-}, async (accessToken, refreshToken, profile, done) => {
+// Configure Google OAuth Strategy (only if credentials are provided)
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: "/api/social-auth/google/callback"
+  }, async (accessToken, refreshToken, profile, done) => {
   try {
     // Check if user exists
     const existingUser = await db.select().from(users).where(eq(users.email, profile.emails![0].value));
@@ -48,10 +49,12 @@ passport.use(new GoogleStrategy({
   } catch (error) {
     return done(error, null);
   }
-}));
+  }));
+}
 
-// Configure Facebook OAuth Strategy
-passport.use(new FacebookStrategy({
+// Configure Facebook OAuth Strategy (only if credentials are provided)
+if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
+  passport.use(new FacebookStrategy({
   clientID: process.env.FACEBOOK_APP_ID || '',
   clientSecret: process.env.FACEBOOK_APP_SECRET || '',
   callbackURL: "/api/social-auth/facebook/callback",
@@ -85,7 +88,8 @@ passport.use(new FacebookStrategy({
   } catch (error) {
     return done(error, null);
   }
-}));
+  }));
+}
 
 // Google OAuth routes
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
