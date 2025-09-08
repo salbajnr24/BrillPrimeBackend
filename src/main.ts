@@ -26,6 +26,7 @@ import searchRoutes from './routes/search';
 import socialAuthRoutes from './routes/social-auth';
 import reportsRoutes from './routes/reports';
 import fuelRoutes from './routes/fuel'; // Import fuel routes
+import tollRoutes from './routes/toll'; // Import toll routes
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -84,6 +85,7 @@ app.use('/api/search', searchRoutes);
 app.use('/api/social-auth', socialAuthRoutes);
 app.use('/api/report', reportsRoutes);
 app.use('/api/fuel', fuelRoutes); // Register fuel routes
+app.use('/api/toll', tollRoutes); // Register toll routes
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
@@ -249,6 +251,16 @@ app.get('/api', (req, res) => {
         - GET /api/report/admin/fraud-alerts - Admin: View fraud detection alerts
         - POST /api/report/admin/blacklist - Admin: Add entity to blacklist
         - DELETE /api/report/admin/blacklist/:id - Admin: Remove from blacklist
+
+        **Toll Gate Payments**:
+        - POST /api/toll/pay - Make toll gate payment (consumers/drivers)
+        - GET /api/toll/history - View toll payment history (consumers/drivers)
+        - GET /api/toll/:id/receipt - Get toll payment receipt with QR code
+        - GET /api/toll/transactions - View all toll payments (admin only)
+        - GET /api/toll/stats - Get toll usage analytics (admin only)
+        - POST /api/toll/locations - Add new toll location (admin only)
+        - PUT /api/toll/locations/:id - Update toll pricing/location info (admin only)
+        - GET /api/toll/locations - Get all toll locations (public)
     },
     authentication: {
       type: 'Bearer Token',

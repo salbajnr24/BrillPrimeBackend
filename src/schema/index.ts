@@ -1,3 +1,4 @@
+
 import { pgTable, text, serial, integer, boolean, timestamp, decimal, uuid, json, jsonb, varchar, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -519,6 +520,67 @@ export const fuelOrders = pgTable('fuel_orders', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
+// Toll Gate Locations Schema
+export const tollLocations = pgTable('toll_locations', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  location: text('location').notNull(),
+  address: text('address').notNull(),
+  latitude: decimal('latitude', { precision: 10, scale: 8 }).notNull(),
+  longitude: decimal('longitude', { precision: 11, scale: 8 }).notNull(),
+  operatorId: integer('operator_id').references(() => users.id),
+  operatingHours: jsonb('operating_hours'), // { start: '06:00', end: '22:00' }
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Toll Pricing Schema
+export const tollPricing = pgTable('toll_pricing', {
+  id: serial('id').primaryKey(),
+  locationId: integer('location_id').notNull().references(() => tollLocations.id),
+  vehicleType: text('vehicle_type', { 
+    enum: ['MOTORCYCLE', 'CAR', 'BUS', 'TRUCK', 'TRAILER'] 
+  }).notNull(),
+  price: decimal('price', { precision: 10, scale: 2 }).notNull(),
+  currency: text('currency').default('NGN'),
+  isActive: boolean('is_active').default(true),
+  validFrom: timestamp('valid_from').defaultNow(),
+  validTo: timestamp('valid_to'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Toll Payments Schema
+export const tollPayments = pgTable('toll_payments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  locationId: integer('location_id').notNull().references(() => tollLocations.id),
+  vehicleType: text('vehicle_type', { 
+    enum: ['MOTORCYCLE', 'CAR', 'BUS', 'TRUCK', 'TRAILER'] 
+  }).notNull(),
+  vehiclePlate: text('vehicle_plate').notNull(),
+  amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
+  currency: text('currency').default('NGN'),
+  paymentMethod: text('payment_method', { 
+    enum: ['CARD', 'BANK_TRANSFER', 'WALLET', 'CASH'] 
+  }).notNull(),
+  paymentReference: text('payment_reference').notNull().unique(),
+  transactionId: text('transaction_id'),
+  status: text('status', { 
+    enum: ['PENDING', 'SUCCESSFUL', 'FAILED', 'CANCELLED'] 
+  }).default('PENDING'),
+  receiptNumber: text('receipt_number').unique(),
+  qrCodeData: text('qr_code_data'),
+  qrCodeImageUrl: text('qr_code_image_url'),
+  paymentDate: timestamp('payment_date').defaultNow(),
+  verifiedAt: timestamp('verified_at'),
+  verifiedBy: integer('verified_by').references(() => users.id),
+  metadata: jsonb('metadata'), // Additional payment data
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   products: many(products),
@@ -542,6 +604,8 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   driverVerifications: many(driverVerifications),
   phoneVerifications: many(phoneVerifications),
   mfaConfiguration: one(mfaConfigurations),
+  tollPayments: many(tollPayments),
+  operatedTollLocations: many(tollLocations),
 }));
 
 export const merchantNotificationsRelations = relations(merchantNotifications, ({ one }) => ({
@@ -645,6 +709,25 @@ export const fuelOrdersRelations = relations(fuelOrders, ({ one }) => ({
   inventory: one(fuelInventory, { fields: [fuelOrders.inventoryId], references: [fuelInventory.id] }),
 }));
 
+// Toll Location Relations
+export const tollLocationsRelations = relations(tollLocations, ({ one, many }) => ({
+  operator: one(users, { fields: [tollLocations.operatorId], references: [users.id] }),
+  pricing: many(tollPricing),
+  payments: many(tollPayments),
+}));
+
+// Toll Pricing Relations
+export const tollPricingRelations = relations(tollPricing, ({ one }) => ({
+  location: one(tollLocations, { fields: [tollPricing.locationId], references: [tollLocations.id] }),
+}));
+
+// Toll Payment Relations
+export const tollPaymentsRelations = relations(tollPayments, ({ one }) => ({
+  user: one(users, { fields: [tollPayments.userId], references: [users.id] }),
+  location: one(tollLocations, { fields: [tollPayments.locationId], references: [tollLocations.id] }),
+  verifiedBy: one(users, { fields: [tollPayments.verifiedBy], references: [users.id] }),
+}));
+
 // Receipts table
 export const receipts = pgTable("receipts", {
   id: serial("id").primaryKey(),
@@ -723,6 +806,9 @@ export const insertUserActivitySchema = createInsertSchema(userActivities);
 export const insertBlacklistedEntitySchema = createInsertSchema(blacklistedEntities);
 export const insertFuelInventorySchema = createInsertSchema(fuelInventory);
 export const insertFuelOrderSchema = createInsertSchema(fuelOrders);
+export const insertTollLocationSchema = createInsertSchema(tollLocations);
+export const insertTollPricingSchema = createInsertSchema(tollPricing);
+export const insertTollPaymentSchema = createInsertSchema(tollPayments);
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -730,6 +816,12 @@ export type FuelInventory = typeof fuelInventory.$inferSelect;
 export type NewFuelInventory = typeof fuelInventory.$inferInsert;
 export type FuelOrder = typeof fuelOrders.$inferSelect;
 export type NewFuelOrder = typeof fuelOrders.$inferInsert;
+export type TollLocation = typeof tollLocations.$inferSelect;
+export type NewTollLocation = typeof tollLocations.$inferInsert;
+export type TollPricing = typeof tollPricing.$inferSelect;
+export type NewTollPricing = typeof tollPricing.$inferInsert;
+export type TollPayment = typeof tollPayments.$inferSelect;
+export type NewTollPayment = typeof tollPayments.$inferInsert;
 export type Product = typeof products.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;
 export type Order = typeof orders.$inferSelect;
