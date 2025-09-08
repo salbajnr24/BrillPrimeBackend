@@ -275,6 +275,41 @@ export const merchantNotifications = pgTable("merchant_notifications", {
   readAt: timestamp("read_at"),
 });
 
+// Consumer Notifications
+export const consumerNotifications = pgTable("consumer_notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  consumerId: integer("consumer_id").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  type: text("type", { 
+    enum: ["ORDER_STATUS", "DELIVERY_UPDATE", "PAYMENT", "PROMOTION", "SYSTEM", "REVIEW_REQUEST"] 
+  }).notNull(),
+  relatedId: uuid("related_id"),
+  isRead: boolean("is_read").default(false),
+  priority: text("priority", { enum: ["LOW", "MEDIUM", "HIGH", "URGENT"] }).default("MEDIUM"),
+  actionUrl: text("action_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  readAt: timestamp("read_at"),
+});
+
+// Driver Notifications
+export const driverNotifications = pgTable("driver_notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  driverId: integer("driver_id").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  type: text("type", { 
+    enum: ["DELIVERY_REQUEST", "PAYOUT_CONFIRMATION", "STATUS_UPDATE", "SYSTEM", "RATING"] 
+  }).notNull(),
+  relatedId: uuid("related_id"),
+  isRead: boolean("is_read").default(false),
+  priority: text("priority", { enum: ["LOW", "MEDIUM", "HIGH", "URGENT"] }).default("MEDIUM"),
+  actionUrl: text("action_url"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  readAt: timestamp("read_at"),
+});
+
 // Support Tickets
 export const supportTickets = pgTable("support_tickets", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -360,6 +395,8 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   vendorConversations: many(conversations, { relationName: "vendorConversations" }),
   deliveryRequests: many(deliveryRequests),
   merchantNotifications: many(merchantNotifications),
+  consumerNotifications: many(consumerNotifications),
+  driverNotifications: many(driverNotifications),
   supportTickets: many(supportTickets),
   identityVerifications: many(identityVerifications),
   driverVerifications: many(driverVerifications),
@@ -369,6 +406,14 @@ export const usersRelations = relations(users, ({ many, one }) => ({
 
 export const merchantNotificationsRelations = relations(merchantNotifications, ({ one }) => ({
   merchant: one(users, { fields: [merchantNotifications.merchantId], references: [users.id] }),
+}));
+
+export const consumerNotificationsRelations = relations(consumerNotifications, ({ one }) => ({
+  consumer: one(users, { fields: [consumerNotifications.consumerId], references: [users.id] }),
+}));
+
+export const driverNotificationsRelations = relations(driverNotifications, ({ one }) => ({
+  driver: one(users, { fields: [driverNotifications.driverId], references: [users.id] }),
 }));
 
 export const supportTicketsRelations = relations(supportTickets, ({ one }) => ({
@@ -490,6 +535,8 @@ export const insertMerchantProfileSchema = createInsertSchema(merchantProfiles);
 export const insertDriverProfileSchema = createInsertSchema(driverProfiles);
 export const insertDeliveryRequestSchema = createInsertSchema(deliveryRequests);
 export const insertMerchantNotificationSchema = createInsertSchema(merchantNotifications);
+export const insertConsumerNotificationSchema = createInsertSchema(consumerNotifications);
+export const insertDriverNotificationSchema = createInsertSchema(driverNotifications);
 export const insertSupportTicketSchema = createInsertSchema(supportTickets);
 export const insertIdentityVerificationSchema = createInsertSchema(identityVerifications);
 export const insertDriverVerificationSchema = createInsertSchema(driverVerifications);
@@ -519,6 +566,10 @@ export type DeliveryRequest = typeof deliveryRequests.$inferSelect;
 export type NewDeliveryRequest = typeof deliveryRequests.$inferInsert;
 export type MerchantNotification = typeof merchantNotifications.$inferSelect;
 export type NewMerchantNotification = typeof merchantNotifications.$inferInsert;
+export type ConsumerNotification = typeof consumerNotifications.$inferSelect;
+export type NewConsumerNotification = typeof consumerNotifications.$inferInsert;
+export type DriverNotification = typeof driverNotifications.$inferSelect;
+export type NewDriverNotification = typeof driverNotifications.$inferInsert;
 export type SupportTicket = typeof supportTickets.$inferSelect;
 export type NewSupportTicket = typeof supportTickets.$inferInsert;
 export type IdentityVerification = typeof identityVerifications.$inferSelect;

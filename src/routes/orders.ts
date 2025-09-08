@@ -1,11 +1,10 @@
-
 import { Router } from 'express';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, sql } from 'drizzle-orm';
 import db from '../config/database';
-import { orders, products, users, cartItems, receipts } from '../schema';
-import { authenticateToken } from '../utils/auth';
-import { v4 as uuidv4 } from 'uuid';
-import axios from 'axios';
+import { orders, products, cartItems, users } from '../schema';
+import { authenticateToken, authorizeRoles } from '../utils/auth';
+import { Message } from '../utils/messages';
+import { createNotification } from './notifications';
 
 const router = Router();
 
@@ -42,7 +41,7 @@ router.post('/checkout', authenticateToken, async (req, res) => {
     // Check for multiple vendors (similar to NestJS logic)
     const vendorIds = cart.map(item => item.product?.sellerId).filter(Boolean);
     const uniqueVendorIds = [...new Set(vendorIds)];
-    
+
     if (uniqueVendorIds.length > 1) {
       return res.status(400).json({ error: 'Cannot place an order with items from multiple vendors.' });
     }
@@ -50,7 +49,7 @@ router.post('/checkout', authenticateToken, async (req, res) => {
     // Create orders for each product
     const createdOrders = [];
     let totalOrderPrice = 0;
-    
+
     for (const item of cart) {
       if (!item.product?.inStock) {
         return res.status(400).json({ error: `Product ${item.product?.name} is out of stock` });
@@ -123,14 +122,14 @@ router.post('/place', authenticateToken, async (req, res) => {
     // Check for multiple vendors
     const vendorIds = cart.map(item => item.product?.sellerId).filter(Boolean);
     const uniqueVendorIds = [...new Set(vendorIds)];
-    
+
     if (uniqueVendorIds.length > 1) {
       return res.status(400).json({ error: 'Cannot place an order with items from multiple vendors.' });
     }
 
     // Create orders
     const createdOrders = [];
-    
+
     for (const item of cart) {
       if (!item.product?.inStock) {
         return res.status(400).json({ error: `Product ${item.product?.name} is out of stock` });
@@ -381,7 +380,7 @@ router.get('/vendor-orders', authenticateToken, async (req, res) => {
 // Update order status (Merchant only)
 router.put('/:id/status', authenticateToken, async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id: orderId } = req.params;
     const sellerId = (req as any).user.userId;
     const { status } = req.body;
 
@@ -392,7 +391,7 @@ router.put('/:id/status', authenticateToken, async (req, res) => {
 
     // Check if order belongs to the seller
     const existingOrder = await db.select().from(orders).where(and(
-      eq(orders.id, id),
+      eq(orders.id, orderId),
       eq(orders.sellerId, sellerId)
     ));
 
@@ -401,12 +400,41 @@ router.put('/:id/status', authenticateToken, async (req, res) => {
     }
 
     const updatedOrder = await db.update(orders)
-      .set({ 
-        status: status as any,
-        updatedAt: new Date()
-      })
-      .where(eq(orders.id, id))
+      .set({ status: status as any })
+      .where(and(
+        eq(orders.id, orderId),
+        eq(orders.sellerId, sellerId)
+      ))
       .returning();
+
+    if (updatedOrder.length === 0) {
+      return res.status(404).json({ error: 'Order not found or unauthorized' });
+    }
+
+    // Create notification for consumer about order status change
+    const statusMessages = {
+      confirmed: 'Your order has been confirmed by the merchant',
+      processing: 'Your order is being processed',
+      shipped: 'Your order has been shipped and is on the way',
+      delivered: 'Your order has been delivered successfully',
+      cancelled: 'Your order has been cancelled'
+    };
+
+    try {
+      await createNotification({
+        userId: updatedOrder[0].buyerId,
+        userRole: 'CONSUMER',
+        title: `Order ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+        message: statusMessages[status as keyof typeof statusMessages] || `Your order status has been updated to ${status}`,
+        type: 'ORDER_STATUS',
+        relatedId: orderId,
+        priority: status === 'delivered' || status === 'cancelled' ? 'HIGH' : 'MEDIUM',
+        actionUrl: `/orders/${orderId}`,
+      });
+    } catch (notificationError) {
+      console.error('Failed to create order status notification:', notificationError);
+      // Don't fail the order update if notification creation fails
+    }
 
     res.json({
       status: 'Success',
@@ -452,7 +480,7 @@ router.patch('/verify-order', authenticateToken, async (req, res) => {
 
     // Update the most recent pending order
     const pendingOrder = userOrders.find(order => order.status === 'pending');
-    
+
     if (pendingOrder) {
       const updatedOrder = await db.update(orders)
         .set({ 
@@ -476,7 +504,7 @@ router.patch('/verify-order', authenticateToken, async (req, res) => {
               'Content-Type': 'application/json'
             }
           });
-          
+
           message += `. Receipt generated: ${receiptResponse.data.receipt.receiptNumber}`;
         } catch (receiptError) {
           console.error('Receipt generation failed:', receiptError);
@@ -606,7 +634,7 @@ router.put('/:id/cancel', authenticateToken, async (req, res) => {
     }
 
     const order = existingOrder[0];
-    
+
     // Only allow cancellation for pending, confirmed, or processing orders
     if (!['pending', 'confirmed', 'processing'].includes(order.status)) {
       return res.status(400).json({ error: 'Order cannot be cancelled at this stage' });

@@ -1,10 +1,11 @@
-
 import { Router } from 'express';
 import axios from 'axios';
-import { authenticateToken } from '../utils/auth';
+import { eq, and, desc, sql } from 'drizzle-orm';
 import db from '../config/database';
-import { orders, users } from '../schema';
-import { eq, and } from 'drizzle-orm';
+import { orders, deliveryRequests } from '../schema';
+import { authenticateToken, authorizeRoles } from '../utils/auth';
+import { createNotification } from './notifications';
+
 
 const router = Router();
 
@@ -71,11 +72,34 @@ router.get('/callback', async (req, res) => {
     }
 
     const paymentData = await verifyPayment(transaction_id as string);
-    
+
     if (paymentData === 'successful') {
+      // Update order status and notify user
+      const order = await db.select().from(orders).where(eq(orders.paymentTxRef, tx_ref as string));
+      if (order.length > 0) {
+        await db.update(orders)
+          .set({ status: 'confirmed', updatedAt: new Date() })
+          .where(eq(orders.id, order[0].id));
+        
+        // Notify consumer about order confirmation
+        await createNotification(order[0].buyerId, 'Order Confirmed', `Your order ${order[0].id} has been confirmed and is being processed.`);
+        
+        // Notify merchant about new order
+        await createNotification(order[0].sellerId, 'New Order', `You have a new order ${order[0].id} to fulfill.`);
+      }
       // Redirect to success page
       return res.redirect(`${process.env.APP_URL || 'http://localhost:3000'}/payment/success?tx_ref=${tx_ref}`);
     } else {
+      // Update order status to failed/cancelled and notify user
+      const order = await db.select().from(orders).where(eq(orders.paymentTxRef, tx_ref as string));
+      if (order.length > 0) {
+        await db.update(orders)
+          .set({ status: 'failed', updatedAt: new Date() })
+          .where(eq(orders.id, order[0].id));
+        
+        // Notify consumer about payment failure
+        await createNotification(order[0].buyerId, 'Payment Failed', `There was an issue processing your payment for order ${order[0].id}. Please try again.`);
+      }
       // Redirect to failure page
       return res.redirect(`${process.env.APP_URL || 'http://localhost:3000'}/payment/failure?tx_ref=${tx_ref}`);
     }
@@ -95,10 +119,33 @@ router.post('/webhook', async (req, res) => {
 
     // Verify webhook signature if needed
     // const signature = req.headers['verif-hash'];
-    
+
     if (status === 'successful') {
       // Update order status or handle successful payment
       console.log(`Payment successful for tx_ref: ${tx_ref}`);
+      const order = await db.select().from(orders).where(eq(orders.paymentTxRef, tx_ref));
+      if (order.length > 0) {
+        await db.update(orders)
+          .set({ status: 'confirmed', updatedAt: new Date() })
+          .where(eq(orders.id, order[0].id));
+        
+        // Notify consumer about order confirmation
+        await createNotification(order[0].buyerId, 'Order Confirmed', `Your order ${order[0].id} has been confirmed and is being processed.`);
+        
+        // Notify merchant about new order
+        await createNotification(order[0].sellerId, 'New Order', `You have a new order ${order[0].id} to fulfill.`);
+      }
+    } else if (status === 'failed') {
+      console.log(`Payment failed for tx_ref: ${tx_ref}`);
+      const order = await db.select().from(orders).where(eq(orders.paymentTxRef, tx_ref));
+      if (order.length > 0) {
+        await db.update(orders)
+          .set({ status: 'failed', updatedAt: new Date() })
+          .where(eq(orders.id, order[0].id));
+        
+        // Notify consumer about payment failure
+        await createNotification(order[0].buyerId, 'Payment Failed', `There was an issue processing your payment for order ${order[0].id}. Please try again.`);
+      }
     }
 
     res.status(200).json({ status: 'success' });
@@ -119,7 +166,7 @@ router.post('/verify', authenticateToken, async (req, res) => {
     }
 
     const paymentStatus = await verifyPayment(transactionId);
-    
+
     // Find and update related orders
     const userOrders = await db.select()
       .from(orders)
@@ -138,7 +185,7 @@ router.post('/verify', authenticateToken, async (req, res) => {
 
     // Update the most recent pending order
     const pendingOrder = userOrders.find(order => order.status === 'pending');
-    
+
     if (pendingOrder) {
       const updatedOrder = await db.update(orders)
         .set({ 
@@ -147,6 +194,14 @@ router.post('/verify', authenticateToken, async (req, res) => {
         })
         .where(eq(orders.id, pendingOrder.id))
         .returning();
+
+        // Notify about order status update
+        if (newStatus === 'confirmed') {
+            await createNotification(updatedOrder[0].buyerId, 'Order Status Update', `Your order ${updatedOrder[0].id} has been confirmed.`);
+            await createNotification(updatedOrder[0].sellerId, 'New Order Confirmation', `Order ${updatedOrder[0].id} has been confirmed.`);
+        } else if (newStatus === 'cancelled') {
+            await createNotification(updatedOrder[0].buyerId, 'Order Status Update', `Your order ${updatedOrder[0].id} has been cancelled due to payment failure.`);
+        }
 
       res.json({
         status: 'Success',
@@ -274,7 +329,7 @@ router.post('/settle/:orderId', authenticateToken, async (req, res) => {
 
     // Note: You'll need to add account details to your users schema
     // For now, this is a placeholder for the settlement logic
-    
+
     res.json({
       status: 'Success',
       message: 'Settlement initiated (implementation pending account details)',
@@ -319,7 +374,7 @@ router.post('/refund/:id', authenticateToken, async (req, res) => {
 
     // Get order details
     const orderData = await db.select().from(orders).where(eq(orders.id, id));
-    
+
     if (orderData.length === 0) {
       return res.status(404).json({ error: 'Order not found' });
     }
@@ -370,6 +425,10 @@ router.post('/refund/:id', authenticateToken, async (req, res) => {
         referenceId: `REF-${Date.now()}-${id}`,
         processedAt: new Date(),
       };
+
+      // Notify relevant parties about the refund
+      await createNotification(order.buyerId, 'Refund Processed', `Your refund for order ${id} has been initiated.`);
+      await createNotification(order.sellerId, 'Refund Issued', `A refund has been issued for order ${id}.`);
 
       res.json({
         status: 'Success',
@@ -431,6 +490,10 @@ router.post('/dispute/:id', authenticateToken, async (req, res) => {
       createdAt: new Date(),
       amount: order.totalPrice,
     };
+
+    // Notify relevant parties about the dispute
+    await createNotification(order.buyerId, 'Dispute Created', `A dispute has been filed for your order ${id}.`);
+    await createNotification(order.sellerId, 'Dispute Filed', `A dispute has been filed against your order ${id}.`);
 
     res.json({
       status: 'Success',
@@ -509,6 +572,9 @@ router.post('/payout', authenticateToken, async (req, res) => {
       requestedAt: new Date(),
       availableBalance,
     };
+
+    // Notify user about payout request submission
+    await createNotification(userId, 'Payout Request Submitted', `Your payout request of ${amount} has been submitted and is pending approval.`);
 
     res.json({
       status: 'Success',
