@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import passport from 'passport';
 import 'dotenv/config';
 
 // Import routes
@@ -35,6 +36,9 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Passport middleware
+app.use(passport.initialize());
 
 // Health check endpoint
 app.get('/', (req, res) => {

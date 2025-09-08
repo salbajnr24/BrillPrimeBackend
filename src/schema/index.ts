@@ -1,28 +1,32 @@
-import { pgTable, text, serial, integer, boolean, timestamp, decimal, uuid, json } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, decimal, uuid, json, jsonb, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
+// Define an enum for user roles if it's not defined elsewhere
+const roleEnum = pgEnum("role", ["CONSUMER", "MERCHANT", "DRIVER"]);
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
-  userId: text("user_id").notNull().unique(),
-  fullName: text("full_name").notNull(),
-  email: text("email").notNull().unique(),
-  phone: text("phone").notNull(),
-  password: text("password").notNull(),
-  role: text("role", { enum: ["CONSUMER", "MERCHANT", "DRIVER"] }).notNull(),
-  isVerified: boolean("is_verified").default(false),
-  isPhoneVerified: boolean("is_phone_verified").default(false),
-  isIdentityVerified: boolean("is_identity_verified").default(false),
+  userId: varchar("user_id", { length: 50 }).notNull().unique(),
+  fullName: varchar("full_name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  phone: varchar("phone", { length: 20 }),
+  password: varchar("password", { length: 255 }), // Password can be null for social auth
+  role: roleEnum("role").notNull().default("CONSUMER"),
   profilePicture: text("profile_picture"),
-  address: text("address"),
-  city: text("city"),
-  state: text("state"),
-  country: text("country").default("Nigeria"),
-  bio: text("bio"),
-  socialProvider: text("social_provider"),
-  socialId: text("social_id"),
-  createdAt: timestamp("created_at").defaultNow(),
+  isVerified: boolean("is_verified").default(false),
+  isActive: boolean("is_active").default(true),
+  city: varchar("city", { length: 100 }),
+  state: varchar("state", { length: 100 }),
+  country: varchar("country", { length: 100 }).default('Nigeria'),
+  latitude: decimal('latitude', { precision: 10, scale: 8 }), // For geo-location
+  longitude: decimal('longitude', { precision: 11, scale: 8 }), // For geo-location
+  address: text('address'), // For geo-location
+  socialAuth: jsonb('social_auth'), // { provider: 'google' | 'facebook' | 'apple', providerId: string }
+  lastLoginAt: timestamp('last_login_at'), // For tracking login activity
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 export const otpCodes = pgTable("otp_codes", {
