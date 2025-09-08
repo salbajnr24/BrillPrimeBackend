@@ -3,7 +3,7 @@ services:
     name: brillprime-backend
     runtime: node
     env: node
-    plan: starter
+    plan: free
     buildCommand: npm ci
     startCommand: npm run start:dev
     envVars:
