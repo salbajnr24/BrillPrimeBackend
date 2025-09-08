@@ -265,7 +265,7 @@ router.get('/orders/:id', authenticateToken, async (req, res) => {
       .from(fuelOrders)
       .leftJoin(users, eq(fuelOrders.merchantId, users.id))
       .leftJoin(merchantProfiles, eq(fuelOrders.merchantId, merchantProfiles.userId))
-      .leftJoin(users.as('driver'), eq(fuelOrders.driverId, users.id))
+      .leftJoin(users, eq(fuelOrders.driverId, users.id))
       .where(and(
         eq(fuelOrders.id, Number(id)),
         eq(fuelOrders.customerId, customerId)

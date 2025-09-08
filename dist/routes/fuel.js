@@ -232,7 +232,7 @@ router.get('/orders/:id', auth_1.authenticateToken, async (req, res) => {
             .from(schema_1.fuelOrders)
             .leftJoin(schema_1.users, (0, drizzle_orm_1.eq)(schema_1.fuelOrders.merchantId, schema_1.users.id))
             .leftJoin(schema_1.merchantProfiles, (0, drizzle_orm_1.eq)(schema_1.fuelOrders.merchantId, schema_1.merchantProfiles.userId))
-            .leftJoin(schema_1.users.as('driver'), (0, drizzle_orm_1.eq)(schema_1.fuelOrders.driverId, schema_1.users.id))
+            .leftJoin(schema_1.users, (0, drizzle_orm_1.eq)(schema_1.fuelOrders.driverId, schema_1.users.id))
             .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.fuelOrders.id, Number(id)), (0, drizzle_orm_1.eq)(schema_1.fuelOrders.customerId, customerId)));
         if (fuelOrder.length === 0) {
             return res.status(404).json({ error: 'Fuel order not found' });
