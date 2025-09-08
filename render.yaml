@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: brillprime-backend
+    runtime: node
+    env: node
+    plan: starter
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: brillprime-db
+          property: connectionString
+    healthCheckPath: /health
+    
+databases:
+  - name: brillprime-db
+    databaseName: brillprime
+    user: brillprime_user
+    plan: starter
