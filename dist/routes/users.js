@@ -298,5 +298,172 @@ router.post('/location', auth_1.authenticateToken, async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 });
+// Switch user role
+router.put('/role', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const { role } = req.body;
+        // Validate role
+        const validRoles = ['CONSUMER', 'MERCHANT', 'DRIVER'];
+        if (!role || !validRoles.includes(role)) {
+            return res.status(400).json({
+                error: 'Invalid role. Must be one of: CONSUMER, MERCHANT, DRIVER'
+            });
+        }
+        // Get current user to check existing role
+        const currentUser = await database_1.default.select().from(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.id, userId));
+        if (currentUser.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        // Update user role
+        const updatedUser = await database_1.default.update(schema_1.users)
+            .set({ role: role })
+            .where((0, drizzle_orm_1.eq)(schema_1.users.id, userId))
+            .returning();
+        // Check if switching to MERCHANT and create profile if not exists
+        if (role === 'MERCHANT') {
+            const existingMerchantProfile = await database_1.default.select()
+                .from(schema_1.merchantProfiles)
+                .where((0, drizzle_orm_1.eq)(schema_1.merchantProfiles.userId, userId));
+            if (existingMerchantProfile.length === 0) {
+                await database_1.default.insert(schema_1.merchantProfiles).values({
+                    userId,
+                    businessName: updatedUser[0].fullName + "'s Business",
+                    businessType: 'OTHER',
+                    businessDescription: 'New merchant profile',
+                });
+            }
+        }
+        // Check if switching to DRIVER and create profile if not exists
+        if (role === 'DRIVER') {
+            const existingDriverProfile = await database_1.default.select()
+                .from(schema_1.driverProfiles)
+                .where((0, drizzle_orm_1.eq)(schema_1.driverProfiles.userId, userId));
+            if (existingDriverProfile.length === 0) {
+                await database_1.default.insert(schema_1.driverProfiles).values({
+                    userId,
+                    vehicleType: 'MOTORCYCLE',
+                    vehiclePlate: 'PENDING',
+                    driverLicense: 'PENDING',
+                });
+            }
+        }
+        res.json({
+            message: `Role switched to ${role} successfully`,
+            user: {
+                id: updatedUser[0].id,
+                userId: updatedUser[0].userId,
+                fullName: updatedUser[0].fullName,
+                email: updatedUser[0].email,
+                role: updatedUser[0].role,
+                previousRole: currentUser[0].role,
+            },
+        });
+    }
+    catch (error) {
+        console.error('Switch role error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+// Public user search (minimal information)
+router.get('/search', async (req, res) => {
+    try {
+        const { q: query, type, page = 1, limit = 10 } = req.query;
+        const offset = (Number(page) - 1) * Number(limit);
+        if (!query || typeof query !== 'string' || query.trim().length < 2) {
+            return res.status(400).json({
+                error: 'Query parameter "q" is required and must be at least 2 characters'
+            });
+        }
+        const searchTerm = `%${query.trim()}%`;
+        let whereConditions = [
+            (0, drizzle_orm_1.eq)(schema_1.users.isVerified, true),
+        ];
+        // Add search conditions
+        whereConditions.push(or((0, drizzle_orm_1.like)(schema_1.users.fullName, searchTerm), (0, drizzle_orm_1.like)(schema_1.users.email, searchTerm)));
+        // Filter by user type if specified
+        if (type && ['CONSUMER', 'MERCHANT', 'DRIVER'].includes(type)) {
+            whereConditions.push((0, drizzle_orm_1.eq)(schema_1.users.role, type));
+        }
+        // Base user query
+        let userQuery = database_1.default.select({
+            id: schema_1.users.id,
+            userId: schema_1.users.userId,
+            fullName: schema_1.users.fullName,
+            email: schema_1.users.email,
+            role: schema_1.users.role,
+            profilePicture: schema_1.users.profilePicture,
+            city: schema_1.users.city,
+            state: schema_1.users.state,
+            isVerified: schema_1.users.isVerified,
+            createdAt: schema_1.users.createdAt,
+        })
+            .from(schema_1.users)
+            .where((0, drizzle_orm_1.and)(...whereConditions))
+            .limit(Number(limit))
+            .offset(offset);
+        const searchResults = await userQuery;
+        // For merchants, get additional business info
+        const merchantIds = searchResults
+            .filter(user => user.role === 'MERCHANT')
+            .map(user => user.id);
+        let merchantProfiles = [];
+        if (merchantIds.length > 0) {
+            merchantProfiles = await database_1.default.select({
+                userId: merchantProfiles.userId,
+                businessName: merchantProfiles.businessName,
+                businessType: merchantProfiles.businessType,
+                rating: merchantProfiles.rating,
+                reviewCount: merchantProfiles.reviewCount,
+                isVerified: merchantProfiles.isVerified,
+            })
+                .from(merchantProfiles)
+                .where((0, drizzle_orm_1.and)(sql `${merchantProfiles.userId} IN (${merchantIds.join(',')})`, (0, drizzle_orm_1.like)(merchantProfiles.businessName, searchTerm)));
+        }
+        // Combine results
+        const enhancedResults = searchResults.map(user => {
+            const result = {
+                id: user.id,
+                userId: user.userId,
+                fullName: user.fullName,
+                role: user.role,
+                profilePicture: user.profilePicture,
+                city: user.city,
+                state: user.state,
+                isVerified: user.isVerified,
+                createdAt: user.createdAt,
+            };
+            // Add merchant info if applicable
+            if (user.role === 'MERCHANT') {
+                const merchantProfile = merchantProfiles.find(mp => mp.userId === user.id);
+                if (merchantProfile) {
+                    result.merchantInfo = {
+                        businessName: merchantProfile.businessName,
+                        businessType: merchantProfile.businessType,
+                        rating: merchantProfile.rating,
+                        reviewCount: merchantProfile.reviewCount,
+                        isVerified: merchantProfile.isVerified,
+                    };
+                }
+            }
+            return result;
+        });
+        res.json({
+            results: enhancedResults,
+            pagination: {
+                page: Number(page),
+                limit: Number(limit),
+                total: searchResults.length,
+                hasMore: searchResults.length === Number(limit),
+            },
+            searchQuery: query,
+            searchType: type || 'ALL',
+        });
+    }
+    catch (error) {
+        console.error('User search error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
 exports.default = router;
 //# sourceMappingURL=users.js.map

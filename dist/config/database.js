@@ -36,13 +36,44 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.db = void 0;
+exports.closeConnection = exports.testConnection = exports.db = void 0;
 const postgres_js_1 = require("drizzle-orm/postgres-js");
 const postgres_1 = __importDefault(require("postgres"));
 const schema = __importStar(require("../schema"));
-const connectionString = process.env.DATABASE_URL;
-// Disable prefetch as it is not supported for "Transaction" pool mode
-const client = (0, postgres_1.default)(connectionString, { prepare: false });
+const connectionString = process.env.DATABASE_URL || 'postgresql://username:password@localhost:5432/brillprime_db';
+// PostgreSQL connection configuration
+const client = (0, postgres_1.default)(connectionString, {
+    prepare: false,
+    max: 10, // Maximum number of connections in the pool
+    idle_timeout: 20,
+    connect_timeout: 10,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    onnotice: () => { }, // Disable notices
+});
 exports.db = (0, postgres_js_1.drizzle)(client, { schema });
+// Test database connection
+const testConnection = async () => {
+    try {
+        await client `SELECT 1`;
+        console.log('✅ Database connected successfully');
+        return true;
+    }
+    catch (error) {
+        console.error('❌ Database connection failed:', error);
+        return false;
+    }
+};
+exports.testConnection = testConnection;
+// Graceful shutdown
+const closeConnection = async () => {
+    try {
+        await client.end();
+        console.log('🔌 Database connection closed');
+    }
+    catch (error) {
+        console.error('❌ Error closing database connection:', error);
+    }
+};
+exports.closeConnection = closeConnection;
 exports.default = exports.db;
 //# sourceMappingURL=database.js.map

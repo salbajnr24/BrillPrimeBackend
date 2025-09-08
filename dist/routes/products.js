@@ -100,7 +100,7 @@ router.get('/', async (req, res) => {
             .leftJoin(schema_1.categories, (0, drizzle_orm_1.eq)(schema_1.products.categoryId, schema_1.categories.id))
             .leftJoin(schema_1.users, (0, drizzle_orm_1.eq)(schema_1.products.sellerId, schema_1.users.id))
             .where((0, drizzle_orm_1.and)(...whereConditions))
-            .orderBy(sortOrder === 'desc' ? (0, drizzle_orm_1.desc)(schema_1.products[sortBy]) : schema_1.products[sortBy])
+            .orderBy(sortOrder === 'desc' ? (0, drizzle_orm_1.desc)(schema_1.products.createdAt) : schema_1.products.createdAt)
             .limit(Number(limit))
             .offset(offset);
         res.json({

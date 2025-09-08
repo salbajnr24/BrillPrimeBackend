@@ -1,0 +1,51 @@
+declare const router: import("express-serve-static-core").Router;
+declare const createNotification: (notificationData: {
+    userId: number;
+    userRole: "CONSUMER" | "MERCHANT" | "DRIVER";
+    title: string;
+    message: string;
+    type: string;
+    relatedId?: string;
+    priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+    actionUrl?: string;
+    expiresAt?: Date;
+}) => Promise<{
+    id: string;
+    createdAt: Date | null;
+    title: string;
+    isRead: boolean | null;
+    merchantId: number;
+    message: string;
+    type: "PROMOTION" | "ORDER" | "PAYMENT" | "DELIVERY" | "SYSTEM" | "REVIEW";
+    relatedId: string | null;
+    priority: "HIGH" | "LOW" | "MEDIUM" | "URGENT" | null;
+    actionUrl: string | null;
+    readAt: Date | null;
+} | {
+    id: string;
+    createdAt: Date | null;
+    title: string;
+    isRead: boolean | null;
+    message: string;
+    type: "PROMOTION" | "PAYMENT" | "SYSTEM" | "ORDER_STATUS" | "DELIVERY_UPDATE" | "REVIEW_REQUEST";
+    relatedId: string | null;
+    priority: "HIGH" | "LOW" | "MEDIUM" | "URGENT" | null;
+    actionUrl: string | null;
+    readAt: Date | null;
+    consumerId: number;
+} | {
+    id: string;
+    createdAt: Date | null;
+    expiresAt: Date | null;
+    driverId: number;
+    title: string;
+    isRead: boolean | null;
+    message: string;
+    type: "SYSTEM" | "DELIVERY_REQUEST" | "PAYOUT_CONFIRMATION" | "STATUS_UPDATE" | "RATING";
+    relatedId: string | null;
+    priority: "HIGH" | "LOW" | "MEDIUM" | "URGENT" | null;
+    actionUrl: string | null;
+    readAt: Date | null;
+}>;
+export { createNotification };
+export default router;
