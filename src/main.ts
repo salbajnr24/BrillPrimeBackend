@@ -29,7 +29,7 @@ import fuelRoutes from './routes/fuel'; // Import fuel routes
 import tollRoutes from './routes/toll'; // Import toll routes
 
 const app = express();
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(helmet());
