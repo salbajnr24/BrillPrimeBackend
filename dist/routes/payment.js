@@ -72,9 +72,23 @@ router.get('/callback', async (req, res) => {
                     .set({ status: 'confirmed', updatedAt: new Date() })
                     .where((0, drizzle_orm_1.eq)(schema_1.orders.id, order[0].id));
                 // Notify consumer about order confirmation
-                await (0, notifications_1.createNotification)(order[0].buyerId, 'Order Confirmed', `Your order ${order[0].id} has been confirmed and is being processed.`);
+                await (0, notifications_1.createNotification)({
+                    userId: order[0].buyerId,
+                    userRole: 'CONSUMER',
+                    title: 'Order Confirmed',
+                    message: `Your order ${order[0].id} has been confirmed and is being processed.`,
+                    type: 'ORDER_UPDATE',
+                    relatedId: order[0].id
+                });
                 // Notify merchant about new order
-                await (0, notifications_1.createNotification)(order[0].sellerId, 'New Order', `You have a new order ${order[0].id} to fulfill.`);
+                await (0, notifications_1.createNotification)({
+                    userId: order[0].sellerId,
+                    userRole: 'MERCHANT',
+                    title: 'New Order',
+                    message: `You have a new order ${order[0].id} to fulfill.`,
+                    type: 'NEW_ORDER',
+                    relatedId: order[0].id
+                });
             }
             // Redirect to success page
             return res.redirect(`${process.env.APP_URL || 'http://localhost:3000'}/payment/success?tx_ref=${tx_ref}`);
@@ -87,7 +101,14 @@ router.get('/callback', async (req, res) => {
                     .set({ status: 'failed', updatedAt: new Date() })
                     .where((0, drizzle_orm_1.eq)(schema_1.orders.id, order[0].id));
                 // Notify consumer about payment failure
-                await (0, notifications_1.createNotification)(order[0].buyerId, 'Payment Failed', `There was an issue processing your payment for order ${order[0].id}. Please try again.`);
+                await (0, notifications_1.createNotification)({
+                    userId: order[0].buyerId,
+                    userRole: 'CONSUMER',
+                    title: 'Payment Failed',
+                    message: `There was an issue processing your payment for order ${order[0].id}. Please try again.`,
+                    type: 'PAYMENT_FAILED',
+                    relatedId: order[0].id
+                });
             }
             // Redirect to failure page
             return res.redirect(`${process.env.APP_URL || 'http://localhost:3000'}/payment/failure?tx_ref=${tx_ref}`);
@@ -115,9 +136,23 @@ router.post('/webhook', async (req, res) => {
                     .set({ status: 'confirmed', updatedAt: new Date() })
                     .where((0, drizzle_orm_1.eq)(schema_1.orders.id, order[0].id));
                 // Notify consumer about order confirmation
-                await (0, notifications_1.createNotification)(order[0].buyerId, 'Order Confirmed', `Your order ${order[0].id} has been confirmed and is being processed.`);
+                await (0, notifications_1.createNotification)({
+                    userId: order[0].buyerId,
+                    userRole: 'CONSUMER',
+                    title: 'Order Confirmed',
+                    message: `Your order ${order[0].id} has been confirmed and is being processed.`,
+                    type: 'ORDER_UPDATE',
+                    relatedId: order[0].id
+                });
                 // Notify merchant about new order
-                await (0, notifications_1.createNotification)(order[0].sellerId, 'New Order', `You have a new order ${order[0].id} to fulfill.`);
+                await (0, notifications_1.createNotification)({
+                    userId: order[0].sellerId,
+                    userRole: 'MERCHANT',
+                    title: 'New Order',
+                    message: `You have a new order ${order[0].id} to fulfill.`,
+                    type: 'NEW_ORDER',
+                    relatedId: order[0].id
+                });
             }
         }
         else if (status === 'failed') {
@@ -128,7 +163,14 @@ router.post('/webhook', async (req, res) => {
                     .set({ status: 'failed', updatedAt: new Date() })
                     .where((0, drizzle_orm_1.eq)(schema_1.orders.id, order[0].id));
                 // Notify consumer about payment failure
-                await (0, notifications_1.createNotification)(order[0].buyerId, 'Payment Failed', `There was an issue processing your payment for order ${order[0].id}. Please try again.`);
+                await (0, notifications_1.createNotification)({
+                    userId: order[0].buyerId,
+                    userRole: 'CONSUMER',
+                    title: 'Payment Failed',
+                    message: `There was an issue processing your payment for order ${order[0].id}. Please try again.`,
+                    type: 'PAYMENT_FAILED',
+                    relatedId: order[0].id
+                });
             }
         }
         res.status(200).json({ status: 'success' });
@@ -173,11 +215,32 @@ router.post('/verify', auth_1.authenticateToken, async (req, res) => {
                 .returning();
             // Notify about order status update
             if (newStatus === 'confirmed') {
-                await (0, notifications_1.createNotification)(updatedOrder[0].buyerId, 'Order Status Update', `Your order ${updatedOrder[0].id} has been confirmed.`);
-                await (0, notifications_1.createNotification)(updatedOrder[0].sellerId, 'New Order Confirmation', `Order ${updatedOrder[0].id} has been confirmed.`);
+                await (0, notifications_1.createNotification)({
+                    userId: updatedOrder[0].buyerId,
+                    userRole: 'CONSUMER',
+                    title: 'Order Status Update',
+                    message: `Your order ${updatedOrder[0].id} has been confirmed.`,
+                    type: 'ORDER_UPDATE',
+                    relatedId: updatedOrder[0].id
+                });
+                await (0, notifications_1.createNotification)({
+                    userId: updatedOrder[0].sellerId,
+                    userRole: 'MERCHANT',
+                    title: 'New Order Confirmation',
+                    message: `Order ${updatedOrder[0].id} has been confirmed.`,
+                    type: 'ORDER_UPDATE',
+                    relatedId: updatedOrder[0].id
+                });
             }
             else if (newStatus === 'cancelled') {
-                await (0, notifications_1.createNotification)(updatedOrder[0].buyerId, 'Order Status Update', `Your order ${updatedOrder[0].id} has been cancelled due to payment failure.`);
+                await (0, notifications_1.createNotification)({
+                    userId: updatedOrder[0].buyerId,
+                    userRole: 'CONSUMER',
+                    title: 'Order Status Update',
+                    message: `Your order ${updatedOrder[0].id} has been cancelled due to payment failure.`,
+                    type: 'ORDER_CANCELLED',
+                    relatedId: updatedOrder[0].id
+                });
             }
             res.json({
                 status: 'Success',
@@ -239,8 +302,22 @@ router.post('/process', auth_1.authenticateToken, (0, fraud_middleware_1.fraudDe
             .set({ status: 'paid', updatedAt: new Date() })
             .where((0, drizzle_orm_1.eq)(schema_1.orders.id, orderId));
         // Notify buyer and seller
-        await (0, notifications_1.createNotification)(userId, 'Payment Successful', `Your payment for order ${orderId} was successful.`);
-        await (0, notifications_1.createNotification)(order[0].sellerId, 'Order Payment Received', `Payment for order ${orderId} has been received.`);
+        await (0, notifications_1.createNotification)({
+            userId: userId,
+            userRole: 'CONSUMER',
+            title: 'Payment Successful',
+            message: `Your payment for order ${orderId} was successful.`,
+            type: 'PAYMENT_SUCCESS',
+            relatedId: orderId
+        });
+        await (0, notifications_1.createNotification)({
+            userId: order[0].sellerId,
+            userRole: 'MERCHANT',
+            title: 'Order Payment Received',
+            message: `Payment for order ${orderId} has been received.`,
+            type: 'PAYMENT_RECEIVED',
+            relatedId: orderId
+        });
         res.json({
             status: 'Success',
             message: 'Payment processed successfully',
@@ -427,8 +504,22 @@ router.post('/refund/:id', auth_1.authenticateToken, async (req, res) => {
                 processedAt: new Date(),
             };
             // Notify relevant parties about the refund
-            await (0, notifications_1.createNotification)(order.buyerId, 'Refund Processed', `Your refund for order ${id} has been initiated.`);
-            await (0, notifications_1.createNotification)(order.sellerId, 'Refund Issued', `A refund has been issued for order ${id}.`);
+            await (0, notifications_1.createNotification)({
+                userId: order.buyerId,
+                userRole: 'CONSUMER',
+                title: 'Refund Processed',
+                message: `Your refund for order ${id} has been initiated.`,
+                type: 'REFUND_PROCESSED',
+                relatedId: id
+            });
+            await (0, notifications_1.createNotification)({
+                userId: order.sellerId,
+                userRole: 'MERCHANT',
+                title: 'Refund Issued',
+                message: `A refund has been issued for order ${id}.`,
+                type: 'REFUND_ISSUED',
+                relatedId: id
+            });
             res.json({
                 status: 'Success',
                 message: 'Refund processed successfully',
@@ -485,8 +576,22 @@ router.post('/dispute/:id', auth_1.authenticateToken, async (req, res) => {
             amount: order.totalPrice,
         };
         // Notify relevant parties about the dispute
-        await (0, notifications_1.createNotification)(order.buyerId, 'Dispute Created', `A dispute has been filed for your order ${id}.`);
-        await (0, notifications_1.createNotification)(order.sellerId, 'Dispute Filed', `A dispute has been filed against your order ${id}.`);
+        await (0, notifications_1.createNotification)({
+            userId: order.buyerId,
+            userRole: 'CONSUMER',
+            title: 'Dispute Created',
+            message: `A dispute has been filed for your order ${id}.`,
+            type: 'DISPUTE_CREATED',
+            relatedId: id
+        });
+        await (0, notifications_1.createNotification)({
+            userId: order.sellerId,
+            userRole: 'MERCHANT',
+            title: 'Dispute Filed',
+            message: `A dispute has been filed against your order ${id}.`,
+            type: 'DISPUTE_FILED',
+            relatedId: id
+        });
         res.json({
             status: 'Success',
             message: 'Payment dispute created successfully',
@@ -552,7 +657,14 @@ router.post('/payout', auth_1.authenticateToken, (0, auth_1.authorizeRoles)('MER
             availableBalance,
         };
         // Notify user about payout request submission
-        await (0, notifications_1.createNotification)(userId, 'Payout Request Submitted', `Your payout request of ${amount} has been submitted and is pending approval.`);
+        await (0, notifications_1.createNotification)({
+            userId: userId,
+            userRole: 'MERCHANT',
+            title: 'Payout Request Submitted',
+            message: `Your payout request of ${amount} has been submitted and is pending approval.`,
+            type: 'PAYOUT_REQUEST',
+            relatedId: payoutRequest[0].id
+        });
         res.json({
             status: 'Success',
             message: 'Payout request submitted successfully',

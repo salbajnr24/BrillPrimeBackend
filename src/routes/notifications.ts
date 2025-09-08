@@ -78,7 +78,7 @@ router.get('/', authenticateToken, async (req, res) => {
     const { isRead, type, page = 1, limit = 20 } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
-    let notifications = [];
+    let notifications: any[] = [];
     let totalCount = 0;
 
     switch (userRole) {
