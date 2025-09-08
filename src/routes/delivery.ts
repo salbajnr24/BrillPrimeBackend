@@ -459,7 +459,7 @@ router.put('/:id/location', authenticateToken, authorizeRoles('DRIVER'), async (
     const delivery = await db.select()
       .from(deliveryRequests)
       .where(and(
-        eq(deliveryRequests.id, Number(deliveryId)),
+        eq(deliveryRequests.id, deliveryId),
         eq(deliveryRequests.driverId, driverId)
       ));
 
@@ -467,15 +467,13 @@ router.put('/:id/location', authenticateToken, authorizeRoles('DRIVER'), async (
       return res.status(404).json({ error: 'Delivery not found or not assigned to you' });
     }
 
-    // Update delivery with current location
+    // Update delivery with current location (storing in special instructions for now)
     const updatedDelivery = await db.update(deliveryRequests)
       .set({
-        currentLatitude: latitude.toString(),
-        currentLongitude: longitude.toString(),
-        currentAddress: address || null,
+        specialInstructions: JSON.stringify({ currentLatitude: latitude, currentLongitude: longitude, currentAddress: address }),
         updatedAt: new Date(),
       })
-      .where(eq(deliveryRequests.id, Number(deliveryId)))
+      .where(eq(deliveryRequests.id, deliveryId))
       .returning();
 
     res.json({
@@ -499,7 +497,7 @@ router.put('/:id/pickup', authenticateToken, authorizeRoles('DRIVER'), async (re
     const delivery = await db.select()
       .from(deliveryRequests)
       .where(and(
-        eq(deliveryRequests.id, Number(deliveryId)),
+        eq(deliveryRequests.id, deliveryId),
         eq(deliveryRequests.driverId, driverId),
         eq(deliveryRequests.status, 'ASSIGNED')
       ));
@@ -512,12 +510,12 @@ router.put('/:id/pickup', authenticateToken, authorizeRoles('DRIVER'), async (re
     const updatedDelivery = await db.update(deliveryRequests)
       .set({
         status: 'PICKED_UP',
-        pickupTime: new Date(),
-        pickupPhotoUrl,
-        pickupNotes: notes,
+        actualPickupTime: new Date(),
+        proofOfDelivery: pickupPhotoUrl || null,
+        specialInstructions: notes || null,
         updatedAt: new Date(),
       })
-      .where(eq(deliveryRequests.id, Number(deliveryId)))
+      .where(eq(deliveryRequests.id, deliveryId))
       .returning();
 
     res.json({
@@ -541,7 +539,7 @@ router.put('/:id/deliver', authenticateToken, authorizeRoles('DRIVER'), async (r
     const delivery = await db.select()
       .from(deliveryRequests)
       .where(and(
-        eq(deliveryRequests.id, Number(deliveryId)),
+        eq(deliveryRequests.id, deliveryId),
         eq(deliveryRequests.driverId, driverId),
         eq(deliveryRequests.status, 'PICKED_UP')
       ));
@@ -554,21 +552,19 @@ router.put('/:id/deliver', authenticateToken, authorizeRoles('DRIVER'), async (r
     const updatedDelivery = await db.update(deliveryRequests)
       .set({
         status: 'DELIVERED',
-        deliveryTime: new Date(),
-        deliveryPhotoUrl,
-        recipientName,
-        recipientSignature,
-        deliveryNotes: notes,
+        actualDeliveryTime: new Date(),
+        proofOfDelivery: deliveryPhotoUrl || null,
+        specialInstructions: notes || null,
         updatedAt: new Date(),
       })
-      .where(eq(deliveryRequests.id, Number(deliveryId)))
+      .where(eq(deliveryRequests.id, deliveryId))
       .returning();
 
     // Update associated order status if linked
     if (delivery[0].orderId) {
       await db.update(orders)
         .set({ status: 'delivered' })
-        .where(eq(orders.id, Number(delivery[0].orderId)));
+        .where(eq(orders.id, delivery[0].orderId as string));
     }
 
     res.json({
