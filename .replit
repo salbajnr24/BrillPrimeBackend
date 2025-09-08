@@ -34,6 +34,6 @@ externalPort = 3000
 channel = "stable-25_05"
 
 [deployment]
-deploymentTarget = "vm"
+deploymentTarget = "autoscale"
 run = ["npm", "start"]
 build = ["npm", "run", "build"]
