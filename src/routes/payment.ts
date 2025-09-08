@@ -2,9 +2,10 @@ import { Router } from 'express';
 import axios from 'axios';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import db from '../config/database';
-import { orders, deliveryRequests } from '../schema';
+import { users, orders, products, driverProfiles } from '../schema';
 import { authenticateToken, authorizeRoles } from '../utils/auth';
 import { createNotification } from './notifications';
+import { fraudDetectionMiddleware, logPaymentMismatch } from '../utils/fraud-middleware';
 
 
 const router = Router();
@@ -80,10 +81,10 @@ router.get('/callback', async (req, res) => {
         await db.update(orders)
           .set({ status: 'confirmed', updatedAt: new Date() })
           .where(eq(orders.id, order[0].id));
-        
+
         // Notify consumer about order confirmation
         await createNotification(order[0].buyerId, 'Order Confirmed', `Your order ${order[0].id} has been confirmed and is being processed.`);
-        
+
         // Notify merchant about new order
         await createNotification(order[0].sellerId, 'New Order', `You have a new order ${order[0].id} to fulfill.`);
       }
@@ -96,7 +97,7 @@ router.get('/callback', async (req, res) => {
         await db.update(orders)
           .set({ status: 'failed', updatedAt: new Date() })
           .where(eq(orders.id, order[0].id));
-        
+
         // Notify consumer about payment failure
         await createNotification(order[0].buyerId, 'Payment Failed', `There was an issue processing your payment for order ${order[0].id}. Please try again.`);
       }
@@ -128,10 +129,10 @@ router.post('/webhook', async (req, res) => {
         await db.update(orders)
           .set({ status: 'confirmed', updatedAt: new Date() })
           .where(eq(orders.id, order[0].id));
-        
+
         // Notify consumer about order confirmation
         await createNotification(order[0].buyerId, 'Order Confirmed', `Your order ${order[0].id} has been confirmed and is being processed.`);
-        
+
         // Notify merchant about new order
         await createNotification(order[0].sellerId, 'New Order', `You have a new order ${order[0].id} to fulfill.`);
       }
@@ -142,7 +143,7 @@ router.post('/webhook', async (req, res) => {
         await db.update(orders)
           .set({ status: 'failed', updatedAt: new Date() })
           .where(eq(orders.id, order[0].id));
-        
+
         // Notify consumer about payment failure
         await createNotification(order[0].buyerId, 'Payment Failed', `There was an issue processing your payment for order ${order[0].id}. Please try again.`);
       }
@@ -217,6 +218,82 @@ router.post('/verify', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Payment verification error:', error);
     res.status(500).json({ error: 'Payment verification failed' });
+  }
+});
+
+// Process payment for order
+router.post('/process', authenticateToken, fraudDetectionMiddleware('PAYMENT'), async (req, res) => {
+  try {
+    const { orderId, amount, paymentMethod } = req.body;
+    const userId = (req as any).user.userId;
+
+    if (!orderId || !amount || !paymentMethod) {
+      return res.status(400).json({ error: 'Order ID, amount, and payment method are required' });
+    }
+
+    // Fetch order details
+    const order = await db.select().from(orders).where(eq(orders.id, orderId));
+
+    if (order.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    if (order[0].buyerId !== userId) {
+      return res.status(403).json({ error: 'You are not authorized to process this order' });
+    }
+
+    // TODO: Integrate with actual payment gateway (Stripe, Paystack, etc.)
+    // For now, we'll simulate payment processing
+    const paymentSuccessful = Math.random() > 0.1; // 90% success rate for demo
+
+    if (!paymentSuccessful) {
+      return res.status(400).json({ 
+        error: 'Payment failed',
+        transactionRef: `failed_${Date.now()}`,
+      });
+    }
+
+    // Check for payment amount mismatch (fraud detection)
+    const expectedAmount = parseFloat(order[0].totalPrice);
+    const actualAmount = parseFloat(amount);
+
+    if (Math.abs(expectedAmount - actualAmount) > 0.01) {
+      await logPaymentMismatch(
+        userId, 
+        expectedAmount, 
+        actualAmount, 
+        paymentMethod,
+        txRef // Assuming txRef is available here, otherwise pass it in req.body
+      );
+
+      return res.status(400).json({ 
+        error: 'Payment amount mismatch detected',
+        expected: expectedAmount,
+        received: actualAmount,
+      });
+    }
+
+    // If payment is successful and amount matches, update order status
+    await db.update(orders)
+      .set({ status: 'paid', updatedAt: new Date() })
+      .where(eq(orders.id, orderId));
+
+    // Notify buyer and seller
+    await createNotification(userId, 'Payment Successful', `Your payment for order ${orderId} was successful.`);
+    await createNotification(order[0].sellerId, 'Order Payment Received', `Payment for order ${orderId} has been received.`);
+
+    res.json({
+      status: 'Success',
+      message: 'Payment processed successfully',
+      data: {
+        orderId,
+        transactionRef: `txn_${Date.now()}_${orderId}`, // Simulate transaction reference
+        paymentStatus: 'paid',
+      },
+    });
+  } catch (error) {
+    console.error('Process payment error:', error);
+    res.status(500).json({ error: 'Payment processing failed' });
   }
 });
 
@@ -506,8 +583,8 @@ router.post('/dispute/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Request payout (Merchant/Driver)
-router.post('/payout', authenticateToken, async (req, res) => {
+// Request payout (merchant/driver)
+router.post('/payout', authenticateToken, authorizeRoles('MERCHANT', 'DRIVER'), fraudDetectionMiddleware('WITHDRAWAL'), async (req, res) => {
   try {
     const userId = (req as any).user.userId;
     const userRole = (req as any).user.role;
@@ -637,6 +714,55 @@ router.get('/payout/history', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Get payout history error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Report system
+router.post('/api/report/user/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params; // User ID to report
+    const { reason, description } = req.body;
+    const reporterId = (req as any).user.userId;
+
+    if (!reason || !description) {
+      return res.status(400).json({ error: 'Reason and description are required for reporting.' });
+    }
+
+    // In a real application, you would insert this into a 'reports' table
+    // For now, we'll log it and notify an admin/moderator.
+    console.log(`User ${reporterId} reported user ${id} for: ${reason} - ${description}`);
+
+    // Example: Notify an admin user (assuming you have an 'ADMIN' role and a way to find them)
+    // await createNotification('adminUserId', 'New User Report', `User ${id} has been reported by ${reporterId}.`);
+
+    res.status(200).json({ message: 'User reported successfully. This report will be reviewed.' });
+  } catch (error) {
+    console.error('Error reporting user:', error);
+    res.status(500).json({ error: 'Failed to submit report.' });
+  }
+});
+
+router.post('/api/report/product/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params; // Product ID to report
+    const { reason, description } = req.body;
+    const reporterId = (req as any).user.userId;
+
+    if (!reason || !description) {
+      return res.status(400).json({ error: 'Reason and description are required for reporting.' });
+    }
+
+    // In a real application, you would insert this into a 'reports' table
+    // For now, we'll log it and notify an admin/moderator.
+    console.log(`User ${reporterId} reported product ${id} for: ${reason} - ${description}`);
+
+    // Example: Notify an admin user
+    // await createNotification('adminUserId', 'New Product Report', `Product ${id} has been reported by ${reporterId}.`);
+
+    res.status(200).json({ message: 'Product reported successfully. This report will be reviewed.' });
+  } catch (error) {
+    console.error('Error reporting product:', error);
+    res.status(500).json({ error: 'Failed to submit report.' });
   }
 });
 

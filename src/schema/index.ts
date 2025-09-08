@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, decimal, uuid, json, jsonb, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, decimal, uuid, json, jsonb, varchar, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -383,6 +383,92 @@ export const mfaConfigurations = pgTable("mfa_configurations", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Trust & Safety - Fraud Detection
+export const fraudAlerts = pgTable("fraud_alerts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: integer("user_id").references(() => users.id),
+  alertType: text("alert_type", { 
+    enum: ["PAYMENT_MISMATCH", "SUSPICIOUS_ACTIVITY", "VELOCITY_CHECK", "IP_CHANGE", "DEVICE_CHANGE", "UNUSUAL_TRANSACTION"] 
+  }).notNull(),
+  severity: text("severity", { enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"] }).notNull(),
+  description: text("description").notNull(),
+  metadata: jsonb("metadata"), // Store additional context data
+  isResolved: boolean("is_resolved").default(false),
+  resolvedBy: integer("resolved_by").references(() => users.id),
+  resolvedAt: timestamp("resolved_at"),
+  resolution: text("resolution"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  relatedTransactionId: text("related_transaction_id"),
+  riskScore: decimal("risk_score", { precision: 3, scale: 2 }).default("0"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Trust & Safety - Reports System
+export const reports = pgTable("reports", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  reporterId: integer("reporter_id").references(() => users.id),
+  reportedUserId: integer("reported_user_id").references(() => users.id),
+  reportedProductId: uuid("reported_product_id").references(() => products.id),
+  reportType: text("report_type", { 
+    enum: ["USER_ABUSE", "PRODUCT_SCAM", "FAKE_LISTING", "INAPPROPRIATE_CONTENT", "FRAUD", "HARASSMENT", "SPAM", "OTHER"] 
+  }).notNull(),
+  category: text("category", { 
+    enum: ["SAFETY", "FRAUD", "CONTENT", "BEHAVIOR", "POLICY_VIOLATION"] 
+  }).notNull(),
+  reason: text("reason").notNull(),
+  description: text("description").notNull(),
+  evidence: text("evidence").array(), // URLs to screenshots, documents, etc.
+  status: text("status", { 
+    enum: ["PENDING", "UNDER_REVIEW", "RESOLVED", "DISMISSED", "ESCALATED"] 
+  }).default("PENDING"),
+  priority: text("priority", { enum: ["LOW", "MEDIUM", "HIGH", "URGENT"] }).default("MEDIUM"),
+  assignedTo: integer("assigned_to").references(() => users.id),
+  adminNotes: text("admin_notes"),
+  resolution: text("resolution"),
+  actionTaken: text("action_taken", { 
+    enum: ["NO_ACTION", "WARNING_SENT", "CONTENT_REMOVED", "USER_SUSPENDED", "USER_BANNED", "PRODUCT_REMOVED", "MERCHANT_RESTRICTED"] 
+  }),
+  reporterAnonymous: boolean("reporter_anonymous").default(false),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
+});
+
+// User Activity Tracking for Fraud Detection
+export const userActivities = pgTable("user_activities", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  activityType: text("activity_type", { 
+    enum: ["LOGIN", "PAYMENT", "ORDER_PLACE", "PROFILE_UPDATE", "PASSWORD_CHANGE", "WITHDRAWAL", "REFUND"] 
+  }).notNull(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  deviceFingerprint: text("device_fingerprint"),
+  location: jsonb("location"), // { country, city, lat, lng }
+  sessionId: text("session_id"),
+  riskScore: decimal("risk_score", { precision: 3, scale: 2 }).default("0"),
+  flagged: boolean("flagged").default(false),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Blacklisted Entities
+export const blacklistedEntities = pgTable("blacklisted_entities", {
+  id: serial("id").primaryKey(),
+  entityType: text("entity_type", { enum: ["EMAIL", "PHONE", "IP", "DEVICE", "BANK_ACCOUNT"] }).notNull(),
+  entityValue: text("entity_value").notNull(),
+  reason: text("reason").notNull(),
+  addedBy: integer("added_by").references(() => users.id).notNull(),
+  isActive: boolean("is_active").default(true),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   products: many(products),
@@ -439,6 +525,26 @@ export const phoneVerificationsRelations = relations(phoneVerifications, ({ one 
 
 export const mfaConfigurationsRelations = relations(mfaConfigurations, ({ one }) => ({
   user: one(users, { fields: [mfaConfigurations.userId], references: [users.id] }),
+}));
+
+export const fraudAlertsRelations = relations(fraudAlerts, ({ one }) => ({
+  user: one(users, { fields: [fraudAlerts.userId], references: [users.id] }),
+  resolvedBy: one(users, { fields: [fraudAlerts.resolvedBy], references: [users.id] }),
+}));
+
+export const reportsRelations = relations(reports, ({ one }) => ({
+  reporter: one(users, { fields: [reports.reporterId], references: [users.id] }),
+  reportedUser: one(users, { fields: [reports.reportedUserId], references: [users.id] }),
+  reportedProduct: one(products, { fields: [reports.reportedProductId], references: [products.id] }),
+  assignedTo: one(users, { fields: [reports.assignedTo], references: [users.id] }),
+}));
+
+export const userActivitiesRelations = relations(userActivities, ({ one }) => ({
+  user: one(users, { fields: [userActivities.userId], references: [users.id] }),
+}));
+
+export const blacklistedEntitiesRelations = relations(blacklistedEntities, ({ one }) => ({
+  addedBy: one(users, { fields: [blacklistedEntities.addedBy], references: [users.id] }),
 }));
 
 export const productsRelations = relations(products, ({ one, many }) => ({
@@ -547,6 +653,10 @@ export const insertDriverVerificationSchema = createInsertSchema(driverVerificat
 export const insertPhoneVerificationSchema = createInsertSchema(phoneVerifications);
 export const insertMfaConfigurationSchema = createInsertSchema(mfaConfigurations);
 export const insertReceiptSchema = createInsertSchema(receipts);
+export const insertFraudAlertSchema = createInsertSchema(fraudAlerts);
+export const insertReportSchema = createInsertSchema(reports);
+export const insertUserActivitySchema = createInsertSchema(userActivities);
+export const insertBlacklistedEntitySchema = createInsertSchema(blacklistedEntities);
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -586,3 +696,11 @@ export type MfaConfiguration = typeof mfaConfigurations.$inferSelect;
 export type NewMfaConfiguration = typeof mfaConfigurations.$inferInsert;
 export type Receipt = typeof receipts.$inferSelect;
 export type NewReceipt = typeof receipts.$inferInsert;
+export type FraudAlert = typeof fraudAlerts.$inferSelect;
+export type NewFraudAlert = typeof fraudAlerts.$inferInsert;
+export type Report = typeof reports.$inferSelect;
+export type NewReport = typeof reports.$inferInsert;
+export type UserActivity = typeof userActivities.$inferSelect;
+export type NewUserActivity = typeof userActivities.$inferInsert;
+export type BlacklistedEntity = typeof blacklistedEntities.$inferSelect;
+export type NewBlacklistedEntity = typeof blacklistedEntities.$inferInsert;

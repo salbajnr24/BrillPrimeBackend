@@ -22,6 +22,9 @@ import verificationRoutes from './routes/verification';
 import uploadRoutes from './routes/upload';
 import adminRoutes from './routes/admin';
 import receiptsRoutes from './routes/receipts';
+import searchRoutes from './routes/search';
+import socialAuthRoutes from './routes/social-auth';
+import reportsRoutes from './routes/reports';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -76,6 +79,9 @@ app.use('/api/verification', verificationRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/receipts', receiptsRoutes);
+app.use('/api/search', searchRoutes);
+app.use('/api/social-auth', socialAuthRoutes);
+app.use('/api/report', reportsRoutes);
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
@@ -229,6 +235,18 @@ app.get('/api', (req, res) => {
         'GET /api/receipts/user/all': 'Get user\'s receipts (authenticated)',
         'POST /api/receipts/scan': 'Scan QR code for verification (authenticated)',
       },
+      **Social Authentication**: POST /api/social-auth/google, /api/social-auth/facebook, /api/social-auth/apple - Third-party authentication
+
+        **Advanced Search & Location**: GET /api/search/products, /api/search/merchants - Advanced filtering with geo-location support
+
+        **Trust & Safety**: 
+        - POST /api/report/user/:id - Report a user for abuse, scam, etc.
+        - POST /api/report/product/:id - Report a product for fake listing, scam, etc.
+        - GET /api/report/my-reports - View your submitted reports
+        - GET /api/report/admin/all - Admin: View all reports
+        - GET /api/report/admin/fraud-alerts - Admin: View fraud detection alerts
+        - POST /api/report/admin/blacklist - Admin: Add entity to blacklist
+        - DELETE /api/report/admin/blacklist/:id - Admin: Remove from blacklist
     },
     authentication: {
       type: 'Bearer Token',

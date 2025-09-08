@@ -23,6 +23,7 @@ import {
   validateResetPassword, 
   validateVerifyOtp 
 } from '../utils/validation';
+import { fraudDetectionMiddleware } from '../utils/fraud-middleware';
 
 const router = Router();
 
@@ -156,8 +157,8 @@ router.post('/verify-otp', async (req, res) => {
   }
 });
 
-// Login endpoint
-router.post('/login', async (req, res) => {
+// Login user
+router.post('/login', fraudDetectionMiddleware('LOGIN'), async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -340,8 +341,8 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
-// Change password endpoint (requires authentication)
-router.put('/change-password', authenticateToken, async (req, res) => {
+// Change password (while logged in)
+router.put('/change-password', authenticateToken, fraudDetectionMiddleware('PASSWORD_CHANGE'), async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     const userId = (req as any).user.userId;
@@ -398,7 +399,7 @@ router.post('/initiate-mfa', authenticateToken, async (req, res) => {
 
     // Check if MFA is already enabled
     const existingMfa = await db.select().from(mfaConfigurations).where(eq(mfaConfigurations.userId, userId));
-    
+
     if (existingMfa.length > 0 && existingMfa[0].isEnabled) {
       return res.status(400).json({ error: 'MFA is already enabled for this account' });
     }
@@ -471,7 +472,7 @@ router.post('/setup-mfa', authenticateToken, async (req, res) => {
 
     // Verify the token to complete setup
     const existingMfa = await db.select().from(mfaConfigurations).where(eq(mfaConfigurations.userId, userId));
-    
+
     if (existingMfa.length === 0) {
       return res.status(400).json({ error: 'No MFA setup in progress. Please start setup first.' });
     }
@@ -540,7 +541,7 @@ router.post('/verify-mfa', async (req, res) => {
 
     // Check if user has MFA enabled
     const mfaConfig = await db.select().from(mfaConfigurations).where(eq(mfaConfigurations.userId, foundUser.id));
-    
+
     if (mfaConfig.length === 0 || !mfaConfig[0].isEnabled) {
       return res.status(400).json({ error: 'MFA is not enabled for this account' });
     }
@@ -632,7 +633,7 @@ router.post('/disable-mfa', authenticateToken, async (req, res) => {
 
     // Check if user has MFA enabled
     const mfaConfig = await db.select().from(mfaConfigurations).where(eq(mfaConfigurations.userId, userId));
-    
+
     if (mfaConfig.length === 0 || !mfaConfig[0].isEnabled) {
       return res.status(400).json({ error: 'MFA is not enabled for this account' });
     }
@@ -675,7 +676,7 @@ router.get('/mfa-status', authenticateToken, async (req, res) => {
     const userId = (req as any).user.userId;
 
     const mfaConfig = await db.select().from(mfaConfigurations).where(eq(mfaConfigurations.userId, userId));
-    
+
     const isEnabled = mfaConfig.length > 0 && mfaConfig[0].isEnabled;
     const backupCodesCount = isEnabled && mfaConfig[0].backupCodes ? mfaConfig[0].backupCodes.length : 0;
 
@@ -686,6 +687,48 @@ router.get('/mfa-status', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Get MFA status error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Report User endpoint
+router.post('/api/report/user/:id', authenticateToken, async (req, res) => {
+  try {
+    const reportedUserId = req.params.id;
+    const { reason } = req.body;
+    const reportingUserId = (req as any).user.userId;
+
+    if (!reason) {
+      return res.status(400).json({ error: 'Reason for reporting is required' });
+    }
+
+    // TODO: Implement actual reporting logic (e.g., saving to database, flagging user)
+    console.log(`User ${reportingUserId} reported user ${reportedUserId} for reason: ${reason}`);
+
+    res.status(200).json({ message: 'User reported successfully' });
+  } catch (error) {
+    console.error('Report user error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Report Product endpoint
+router.post('/api/report/product/:id', authenticateToken, async (req, res) => {
+  try {
+    const reportedProductId = req.params.id;
+    const { reason } = req.body;
+    const reportingUserId = (req as any).user.userId;
+
+    if (!reason) {
+      return res.status(400).json({ error: 'Reason for reporting is required' });
+    }
+
+    // TODO: Implement actual reporting logic (e.g., saving to database, flagging product)
+    console.log(`User ${reportingUserId} reported product ${reportedProductId} for reason: ${reason}`);
+
+    res.status(200).json({ message: 'Product reported successfully' });
+  } catch (error) {
+    console.error('Report product error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
