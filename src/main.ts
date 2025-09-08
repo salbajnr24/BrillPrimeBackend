@@ -239,28 +239,46 @@ app.get('/api', (req, res) => {
         'GET /api/receipts/user/all': 'Get user\'s receipts (authenticated)',
         'POST /api/receipts/scan': 'Scan QR code for verification (authenticated)',
       },
-      **Social Authentication**: POST /api/social-auth/google, /api/social-auth/facebook, /api/social-auth/apple - Third-party authentication
-
-        **Advanced Search & Location**: GET /api/search/products, /api/search/merchants - Advanced filtering with geo-location support
-
-        **Trust & Safety**:
-        - POST /api/report/user/:id - Report a user for abuse, scam, etc.
-        - POST /api/report/product/:id - Report a product for fake listing, scam, etc.
-        - GET /api/report/my-reports - View your submitted reports
-        - GET /api/report/admin/all - Admin: View all reports
-        - GET /api/report/admin/fraud-alerts - Admin: View fraud detection alerts
-        - POST /api/report/admin/blacklist - Admin: Add entity to blacklist
-        - DELETE /api/report/admin/blacklist/:id - Admin: Remove from blacklist
-
-        **Toll Gate Payments**:
-        - POST /api/toll/pay - Make toll gate payment (consumers/drivers)
-        - GET /api/toll/history - View toll payment history (consumers/drivers)
-        - GET /api/toll/:id/receipt - Get toll payment receipt with QR code
-        - GET /api/toll/transactions - View all toll payments (admin only)
-        - GET /api/toll/stats - Get toll usage analytics (admin only)
-        - POST /api/toll/locations - Add new toll location (admin only)
-        - PUT /api/toll/locations/:id - Update toll pricing/location info (admin only)
-        - GET /api/toll/locations - Get all toll locations (public)
+      socialAuth: {
+        'POST /api/social-auth/google': 'Google OAuth authentication',
+        'POST /api/social-auth/facebook': 'Facebook OAuth authentication',
+        'POST /api/social-auth/apple': 'Apple OAuth authentication',
+      },
+      search: {
+        'GET /api/search/products': 'Advanced product search with geo-location support',
+        'GET /api/search/merchants': 'Search merchants with location filtering',
+      },
+      fuel: {
+        'POST /api/fuel/order': 'Place fuel order (bulk or small scale)',
+        'GET /api/fuel/orders': 'View user fuel orders',
+        'GET /api/fuel/orders/:id': 'Get fuel order details',
+        'PUT /api/fuel/orders/:id/cancel': 'Cancel fuel order',
+        'GET /api/fuel/merchant/orders': 'View incoming fuel orders (merchant)',
+        'PUT /api/fuel/orders/:id/status': 'Update order status (merchant)',
+        'GET /api/fuel/inventory': 'Manage fuel inventory (merchant)',
+        'PUT /api/fuel/inventory': 'Update fuel inventory (merchant)',
+        'GET /api/fuel/deliveries': 'Assigned fuel deliveries (driver)',
+        'PUT /api/fuel/deliveries/:id/status': 'Update delivery status (driver)',
+      },
+      toll: {
+        'POST /api/toll/pay': 'Make toll gate payment (consumers/drivers)',
+        'GET /api/toll/history': 'View toll payment history (consumers/drivers)',
+        'GET /api/toll/:id/receipt': 'Get toll payment receipt with QR code',
+        'GET /api/toll/transactions': 'View all toll payments (admin only)',
+        'GET /api/toll/stats': 'Get toll usage analytics (admin only)',
+        'POST /api/toll/locations': 'Add new toll location (admin only)',
+        'PUT /api/toll/locations/:id': 'Update toll pricing/location info (admin only)',
+        'GET /api/toll/locations': 'Get all toll locations (public)',
+      },
+      trustSafety: {
+        'POST /api/report/user/:id': 'Report a user for abuse, scam, etc.',
+        'POST /api/report/product/:id': 'Report a product for fake listing, scam, etc.',
+        'GET /api/report/my-reports': 'View your submitted reports',
+        'GET /api/report/admin/all': 'Admin: View all reports',
+        'GET /api/report/admin/fraud-alerts': 'Admin: View fraud detection alerts',
+        'POST /api/report/admin/blacklist': 'Admin: Add entity to blacklist',
+        'DELETE /api/report/admin/blacklist/:id': 'Admin: Remove from blacklist',
+      }
     },
     authentication: {
       type: 'Bearer Token',
