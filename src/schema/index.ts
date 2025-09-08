@@ -469,6 +469,56 @@ export const blacklistedEntities = pgTable("blacklisted_entities", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Fuel Inventory Schema
+export const fuelInventory = pgTable('fuel_inventory', {
+  id: serial('id').primaryKey(),
+  merchantId: integer('merchant_id').notNull().references(() => users.id),
+  fuelType: text('fuel_type', { 
+    enum: ['PETROL', 'DIESEL', 'KEROSENE', 'COOKING_GAS', 'INDUSTRIAL_GAS'] 
+  }).notNull(),
+  quantity: decimal('quantity', { precision: 12, scale: 2 }).notNull(),
+  unit: text('unit', { enum: ['LITERS', 'GALLONS', 'KG', 'TONS'] }).notNull(),
+  pricePerUnit: decimal('price_per_unit', { precision: 10, scale: 2 }).notNull(),
+  minimumOrderQuantity: decimal('minimum_order_quantity', { precision: 10, scale: 2 }).default('1'),
+  maximumOrderQuantity: decimal('maximum_order_quantity', { precision: 12, scale: 2 }),
+  isAvailable: boolean('is_available').default(true),
+  location: text('location'),
+  description: text('description'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Fuel Orders Schema
+export const fuelOrders = pgTable('fuel_orders', {
+  id: serial('id').primaryKey(),
+  customerId: integer('customer_id').notNull().references(() => users.id),
+  merchantId: integer('merchant_id').notNull().references(() => users.id),
+  driverId: integer('driver_id').references(() => users.id),
+  inventoryId: integer('inventory_id').notNull().references(() => fuelInventory.id),
+  orderType: text('order_type', { enum: ['BULK', 'SMALL_SCALE'] }).notNull(),
+  fuelType: text('fuel_type', { 
+    enum: ['PETROL', 'DIESEL', 'KEROSENE', 'COOKING_GAS', 'INDUSTRIAL_GAS'] 
+  }).notNull(),
+  quantity: decimal('quantity', { precision: 12, scale: 2 }).notNull(),
+  unit: text('unit', { enum: ['LITERS', 'GALLONS', 'KG', 'TONS'] }).notNull(),
+  pricePerUnit: decimal('price_per_unit', { precision: 10, scale: 2 }).notNull(),
+  totalPrice: decimal('total_price', { precision: 12, scale: 2 }).notNull(),
+  deliveryAddress: text('delivery_address').notNull(),
+  deliveryDate: timestamp('delivery_date'),
+  status: text('status', { 
+    enum: ['PENDING', 'CONFIRMED', 'PROCESSING', 'DISPATCHED', 'DELIVERED', 'CANCELLED'] 
+  }).default('PENDING'),
+  paymentStatus: text('payment_status', { 
+    enum: ['PENDING', 'PAID', 'REFUNDED'] 
+  }).default('PENDING'),
+  specialInstructions: text('special_instructions'),
+  orderNumber: text('order_number').unique(),
+  estimatedDeliveryTime: timestamp('estimated_delivery_time'),
+  actualDeliveryTime: timestamp('actual_delivery_time'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   products: many(products),
@@ -581,6 +631,20 @@ export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
   sender: one(users, { fields: [chatMessages.senderId], references: [users.id] }),
 }));
 
+// Fuel Inventory Relations
+export const fuelInventoryRelations = relations(fuelInventory, ({ one, many }) => ({
+  merchant: one(users, { fields: [fuelInventory.merchantId], references: [users.id] }),
+  fuelOrders: many(fuelOrders),
+}));
+
+// Fuel Orders Relations
+export const fuelOrdersRelations = relations(fuelOrders, ({ one }) => ({
+  customer: one(users, { fields: [fuelOrders.customerId], references: [users.id] }),
+  merchant: one(users, { fields: [fuelOrders.merchantId], references: [users.id] }),
+  driver: one(users, { fields: [fuelOrders.driverId], references: [users.id] }),
+  inventory: one(fuelInventory, { fields: [fuelOrders.inventoryId], references: [fuelInventory.id] }),
+}));
+
 // Receipts table
 export const receipts = pgTable("receipts", {
   id: serial("id").primaryKey(),
@@ -657,9 +721,15 @@ export const insertFraudAlertSchema = createInsertSchema(fraudAlerts);
 export const insertReportSchema = createInsertSchema(reports);
 export const insertUserActivitySchema = createInsertSchema(userActivities);
 export const insertBlacklistedEntitySchema = createInsertSchema(blacklistedEntities);
+export const insertFuelInventorySchema = createInsertSchema(fuelInventory);
+export const insertFuelOrderSchema = createInsertSchema(fuelOrders);
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type FuelInventory = typeof fuelInventory.$inferSelect;
+export type NewFuelInventory = typeof fuelInventory.$inferInsert;
+export type FuelOrder = typeof fuelOrders.$inferSelect;
+export type NewFuelOrder = typeof fuelOrders.$inferInsert;
 export type Product = typeof products.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;
 export type Order = typeof orders.$inferSelect;
@@ -679,28 +749,28 @@ export type NewDriverProfile = typeof driverProfiles.$inferInsert;
 export type DeliveryRequest = typeof deliveryRequests.$inferSelect;
 export type NewDeliveryRequest = typeof deliveryRequests.$inferInsert;
 export type MerchantNotification = typeof merchantNotifications.$inferSelect;
-export type NewMerchantNotification = typeof merchantNotifications.$inferInsert;
+export type NewMerchantNotification = typeof merchantNotifications.$insert;
 export type ConsumerNotification = typeof consumerNotifications.$inferSelect;
-export type NewConsumerNotification = typeof consumerNotifications.$inferInsert;
+export type NewConsumerNotification = typeof consumerNotifications.$insert;
 export type DriverNotification = typeof driverNotifications.$inferSelect;
-export type NewDriverNotification = typeof driverNotifications.$inferInsert;
+export type NewDriverNotification = typeof driverNotifications.$insert;
 export type SupportTicket = typeof supportTickets.$inferSelect;
-export type NewSupportTicket = typeof supportTickets.$inferInsert;
+export type NewSupportTicket = typeof supportTickets.$insert;
 export type IdentityVerification = typeof identityVerifications.$inferSelect;
-export type NewIdentityVerification = typeof identityVerifications.$inferInsert;
+export type NewIdentityVerification = typeof identityVerifications.$insert;
 export type DriverVerification = typeof driverVerifications.$inferSelect;
-export type NewDriverVerification = typeof driverVerifications.$inferInsert;
+export type NewDriverVerification = typeof driverVerifications.$insert;
 export type PhoneVerification = typeof phoneVerifications.$inferSelect;
-export type NewPhoneVerification = typeof phoneVerifications.$inferInsert;
+export type NewPhoneVerification = typeof phoneVerifications.$insert;
 export type MfaConfiguration = typeof mfaConfigurations.$inferSelect;
-export type NewMfaConfiguration = typeof mfaConfigurations.$inferInsert;
+export type NewMfaConfiguration = typeof mfaConfigurations.$insert;
 export type Receipt = typeof receipts.$inferSelect;
-export type NewReceipt = typeof receipts.$inferInsert;
+export type NewReceipt = typeof receipts.$insert;
 export type FraudAlert = typeof fraudAlerts.$inferSelect;
-export type NewFraudAlert = typeof fraudAlerts.$inferInsert;
+export type NewFraudAlert = typeof fraudAlerts.$insert;
 export type Report = typeof reports.$inferSelect;
-export type NewReport = typeof reports.$inferInsert;
+export type NewReport = typeof reports.$insert;
 export type UserActivity = typeof userActivities.$inferSelect;
-export type NewUserActivity = typeof userActivities.$inferInsert;
+export type NewUserActivity = typeof userActivities.$insert;
 export type BlacklistedEntity = typeof blacklistedEntities.$inferSelect;
-export type NewBlacklistedEntity = typeof blacklistedEntities.$inferInsert;
+export type NewBlacklistedEntity = typeof blacklistedEntities.$insert;

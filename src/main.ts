@@ -25,6 +25,7 @@ import receiptsRoutes from './routes/receipts';
 import searchRoutes from './routes/search';
 import socialAuthRoutes from './routes/social-auth';
 import reportsRoutes from './routes/reports';
+import fuelRoutes from './routes/fuel'; // Import fuel routes
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -82,6 +83,7 @@ app.use('/api/receipts', receiptsRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/social-auth', socialAuthRoutes);
 app.use('/api/report', reportsRoutes);
+app.use('/api/fuel', fuelRoutes); // Register fuel routes
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
@@ -239,7 +241,7 @@ app.get('/api', (req, res) => {
 
         **Advanced Search & Location**: GET /api/search/products, /api/search/merchants - Advanced filtering with geo-location support
 
-        **Trust & Safety**: 
+        **Trust & Safety**:
         - POST /api/report/user/:id - Report a user for abuse, scam, etc.
         - POST /api/report/product/:id - Report a product for fake listing, scam, etc.
         - GET /api/report/my-reports - View your submitted reports
