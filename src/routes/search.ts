@@ -111,7 +111,7 @@ router.get('/products', async (req, res) => {
 
     // Geo-location filter
     if (latitude && longitude && radius) {
-      selectQuery = selectQuery.having(
+      selectQuery = (selectQuery as any).having(
         sql`6371 * acos(cos(radians(${Number(latitude)})) * cos(radians(CAST(${users.latitude} AS DECIMAL))) * cos(radians(CAST(${users.longitude} AS DECIMAL)) - radians(${Number(longitude)})) + sin(radians(${Number(latitude)})) * sin(radians(CAST(${users.latitude} AS DECIMAL)))) <= ${Number(radius)}`
       );
     }
@@ -119,27 +119,27 @@ router.get('/products', async (req, res) => {
     // Sorting
     switch (sortBy) {
       case 'price':
-        selectQuery = selectQuery.orderBy(
+        selectQuery = (selectQuery as any).orderBy(
           sortOrder === 'asc' ? asc(sql`CAST(${products.price} AS DECIMAL)`) : desc(sql`CAST(${products.price} AS DECIMAL)`)
         );
         break;
       case 'rating':
-        selectQuery = selectQuery.orderBy(
+        selectQuery = (selectQuery as any).orderBy(
           sortOrder === 'asc' ? asc(sql`CAST(${products.rating} AS DECIMAL)`) : desc(sql`CAST(${products.rating} AS DECIMAL)`)
         );
         break;
       case 'distance':
         if (latitude && longitude) {
-          selectQuery = selectQuery.orderBy(asc(sql`6371 * acos(cos(radians(${Number(latitude)})) * cos(radians(CAST(${users.latitude} AS DECIMAL))) * cos(radians(CAST(${users.longitude} AS DECIMAL)) - radians(${Number(longitude)})) + sin(radians(${Number(latitude)})) * sin(radians(CAST(${users.latitude} AS DECIMAL))))`));
+          selectQuery = (selectQuery as any).orderBy(asc(sql`6371 * acos(cos(radians(${Number(latitude)})) * cos(radians(CAST(${users.latitude} AS DECIMAL))) * cos(radians(CAST(${users.longitude} AS DECIMAL)) - radians(${Number(longitude)})) + sin(radians(${Number(latitude)})) * sin(radians(CAST(${users.latitude} AS DECIMAL))))`));
         }
         break;
       case 'name':
-        selectQuery = selectQuery.orderBy(
+        selectQuery = (selectQuery as any).orderBy(
           sortOrder === 'asc' ? asc(products.name) : desc(products.name)
         );
         break;
       default: // relevance or createdAt
-        selectQuery = selectQuery.orderBy(desc(products.createdAt));
+        selectQuery = (selectQuery as any).orderBy(desc(products.createdAt));
     }
 
     const searchResults = await selectQuery.limit(Number(limit)).offset(offset);

@@ -136,7 +136,7 @@ export class FraudDetection {
       .from(userActivities)
       .where(and(
         eq(userActivities.userId, data.userId),
-        eq(userActivities.activityType, data.activityType),
+        eq(userActivities.activityType, data.activityType as any),
         gte(userActivities.createdAt, windowStart)
       ));
 
@@ -236,7 +236,7 @@ export class FraudDetection {
   private static async logActivity(data: ActivityData & { riskScore: number; flagged: boolean }): Promise<void> {
     await db.insert(userActivities).values({
       userId: data.userId,
-      activityType: data.activityType,
+      activityType: data.activityType as any,
       ipAddress: data.ipAddress,
       userAgent: data.userAgent,
       deviceFingerprint: data.deviceFingerprint,

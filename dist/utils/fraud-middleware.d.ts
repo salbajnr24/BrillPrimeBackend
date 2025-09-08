@@ -5,6 +5,9 @@ export interface AuthenticatedRequest extends Request {
         role: string;
         email: string;
     };
+    session?: {
+        id?: string;
+    };
 }
 export declare const fraudDetectionMiddleware: (activityType: string) => (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void | Response<any, Record<string, any>>>;
 export declare const logPaymentMismatch: (userId: number, expectedAmount: number, actualAmount: number, paymentMethod: string, transactionRef?: string) => Promise<void>;

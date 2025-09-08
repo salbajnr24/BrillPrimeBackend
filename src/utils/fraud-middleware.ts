@@ -8,6 +8,9 @@ export interface AuthenticatedRequest extends Request {
     role: string;
     email: string;
   };
+  session?: {
+    id?: string;
+  };
 }
 
 export const fraudDetectionMiddleware = (activityType: string) => {

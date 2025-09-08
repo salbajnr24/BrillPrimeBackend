@@ -14,7 +14,7 @@ const fraudDetectionMiddleware = (activityType) => {
                 ipAddress: req.ip,
                 userAgent: req.get('User-Agent'),
                 deviceFingerprint: req.get('X-Device-Fingerprint'), // Custom header from frontend
-                sessionId: req.sessionID,
+                sessionId: req.session?.id || req.headers['x-session-id'],
                 metadata: {
                     endpoint: req.path,
                     method: req.method,
