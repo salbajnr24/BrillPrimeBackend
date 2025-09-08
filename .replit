@@ -1,4 +1,4 @@
-modules = ["nodejs-20"]
+modules = ["nodejs-20", "postgresql-16"]
 [agent]
 expertMode = true
 
@@ -18,25 +18,22 @@ args = "BrillPrime Backend API"
 name = "BrillPrime Backend API"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npm run start:dev"
-
-[workflows.workflow.metadata]
-outputType = "console"
+waitForPort = 3000
 
 [[ports]]
 localPort = 3000
 externalPort = 3000
-
-[[ports]]
-localPort = 5000
-externalPort = 80
 
 [nix]
 channel = "stable-25_05"
 
 [deployment]
 deploymentTarget = "vm"
-run = ["npm"]
+run = ["npm", "start"]
 build = ["npm", "run", "build"]
