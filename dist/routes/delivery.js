@@ -390,19 +390,17 @@ router.put('/:id/location', auth_1.authenticateToken, (0, auth_1.authorizeRoles)
         // Verify this driver is assigned to the delivery
         const delivery = await database_1.default.select()
             .from(schema_1.deliveryRequests)
-            .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.deliveryRequests.id, Number(deliveryId)), (0, drizzle_orm_1.eq)(schema_1.deliveryRequests.driverId, driverId)));
+            .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.deliveryRequests.id, deliveryId), (0, drizzle_orm_1.eq)(schema_1.deliveryRequests.driverId, driverId)));
         if (delivery.length === 0) {
             return res.status(404).json({ error: 'Delivery not found or not assigned to you' });
         }
-        // Update delivery with current location
+        // Update delivery with current location (storing in special instructions for now)
         const updatedDelivery = await database_1.default.update(schema_1.deliveryRequests)
             .set({
-            currentLatitude: latitude.toString(),
-            currentLongitude: longitude.toString(),
-            currentAddress: address || null,
+            specialInstructions: JSON.stringify({ currentLatitude: latitude, currentLongitude: longitude, currentAddress: address }),
             updatedAt: new Date(),
         })
-            .where((0, drizzle_orm_1.eq)(schema_1.deliveryRequests.id, Number(deliveryId)))
+            .where((0, drizzle_orm_1.eq)(schema_1.deliveryRequests.id, deliveryId))
             .returning();
         res.json({
             message: 'Location updated successfully',
@@ -423,7 +421,7 @@ router.put('/:id/pickup', auth_1.authenticateToken, (0, auth_1.authorizeRoles)('
         // Verify this driver is assigned to the delivery
         const delivery = await database_1.default.select()
             .from(schema_1.deliveryRequests)
-            .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.deliveryRequests.id, Number(deliveryId)), (0, drizzle_orm_1.eq)(schema_1.deliveryRequests.driverId, driverId), (0, drizzle_orm_1.eq)(schema_1.deliveryRequests.status, 'ASSIGNED')));
+            .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.deliveryRequests.id, deliveryId), (0, drizzle_orm_1.eq)(schema_1.deliveryRequests.driverId, driverId), (0, drizzle_orm_1.eq)(schema_1.deliveryRequests.status, 'ASSIGNED')));
         if (delivery.length === 0) {
             return res.status(404).json({ error: 'Delivery not found, not assigned to you, or not in correct status' });
         }
@@ -431,12 +429,12 @@ router.put('/:id/pickup', auth_1.authenticateToken, (0, auth_1.authorizeRoles)('
         const updatedDelivery = await database_1.default.update(schema_1.deliveryRequests)
             .set({
             status: 'PICKED_UP',
-            pickupTime: new Date(),
-            pickupPhotoUrl,
-            pickupNotes: notes,
+            actualPickupTime: new Date(),
+            proofOfDelivery: pickupPhotoUrl || null,
+            specialInstructions: notes || null,
             updatedAt: new Date(),
         })
-            .where((0, drizzle_orm_1.eq)(schema_1.deliveryRequests.id, Number(deliveryId)))
+            .where((0, drizzle_orm_1.eq)(schema_1.deliveryRequests.id, deliveryId))
             .returning();
         res.json({
             message: 'Delivery marked as picked up',
@@ -457,7 +455,7 @@ router.put('/:id/deliver', auth_1.authenticateToken, (0, auth_1.authorizeRoles)(
         // Verify this driver is assigned to the delivery
         const delivery = await database_1.default.select()
             .from(schema_1.deliveryRequests)
-            .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.deliveryRequests.id, Number(deliveryId)), (0, drizzle_orm_1.eq)(schema_1.deliveryRequests.driverId, driverId), (0, drizzle_orm_1.eq)(schema_1.deliveryRequests.status, 'PICKED_UP')));
+            .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.deliveryRequests.id, deliveryId), (0, drizzle_orm_1.eq)(schema_1.deliveryRequests.driverId, driverId), (0, drizzle_orm_1.eq)(schema_1.deliveryRequests.status, 'PICKED_UP')));
         if (delivery.length === 0) {
             return res.status(404).json({ error: 'Delivery not found, not assigned to you, or not picked up yet' });
         }
@@ -465,20 +463,18 @@ router.put('/:id/deliver', auth_1.authenticateToken, (0, auth_1.authorizeRoles)(
         const updatedDelivery = await database_1.default.update(schema_1.deliveryRequests)
             .set({
             status: 'DELIVERED',
-            deliveryTime: new Date(),
-            deliveryPhotoUrl,
-            recipientName,
-            recipientSignature,
-            deliveryNotes: notes,
+            actualDeliveryTime: new Date(),
+            proofOfDelivery: deliveryPhotoUrl || null,
+            specialInstructions: notes || null,
             updatedAt: new Date(),
         })
-            .where((0, drizzle_orm_1.eq)(schema_1.deliveryRequests.id, Number(deliveryId)))
+            .where((0, drizzle_orm_1.eq)(schema_1.deliveryRequests.id, deliveryId))
             .returning();
         // Update associated order status if linked
         if (delivery[0].orderId) {
             await database_1.default.update(schema_1.orders)
                 .set({ status: 'delivered' })
-                .where((0, drizzle_orm_1.eq)(schema_1.orders.id, Number(delivery[0].orderId)));
+                .where((0, drizzle_orm_1.eq)(schema_1.orders.id, delivery[0].orderId));
         }
         res.json({
             message: 'Delivery completed successfully',
@@ -517,10 +513,10 @@ router.get('/track/:trackingNumber', async (req, res) => {
             pickupAddress: deliveryData.delivery.pickupAddress,
             deliveryAddress: deliveryData.delivery.deliveryAddress,
             estimatedDuration: deliveryData.delivery.estimatedDuration,
-            currentLocation: deliveryData.delivery.currentLatitude && deliveryData.delivery.currentLongitude ? {
-                latitude: parseFloat(deliveryData.delivery.currentLatitude),
-                longitude: parseFloat(deliveryData.delivery.currentLongitude),
-                address: deliveryData.delivery.currentAddress,
+            currentLocation: deliveryData.delivery.pickupLocation ? {
+                latitude: deliveryData.delivery.pickupLocation.latitude || 0,
+                longitude: deliveryData.delivery.pickupLocation.longitude || 0,
+                address: deliveryData.delivery.pickupAddress,
             } : null,
             driver: deliveryData.driver ? {
                 name: deliveryData.driver.fullName,
@@ -529,14 +525,13 @@ router.get('/track/:trackingNumber', async (req, res) => {
             } : null,
             timeline: {
                 createdAt: deliveryData.delivery.createdAt,
-                assignedAt: deliveryData.delivery.assignedAt,
-                pickupTime: deliveryData.delivery.pickupTime,
-                deliveryTime: deliveryData.delivery.deliveryTime,
+                scheduledPickupTime: deliveryData.delivery.scheduledPickupTime,
+                actualPickupTime: deliveryData.delivery.actualPickupTime,
+                actualDeliveryTime: deliveryData.delivery.actualDeliveryTime,
             },
             proofOfDelivery: deliveryData.delivery.status === 'DELIVERED' ? {
-                deliveryPhotoUrl: deliveryData.delivery.deliveryPhotoUrl,
-                recipientName: deliveryData.delivery.recipientName,
-                deliveryNotes: deliveryData.delivery.deliveryNotes,
+                proofUrl: deliveryData.delivery.proofOfDelivery,
+                specialInstructions: deliveryData.delivery.specialInstructions,
             } : null,
         });
     }
@@ -682,9 +677,9 @@ router.get('/:id/route', auth_1.authenticateToken, (0, auth_1.authorizeRoles)('D
             deliveryAddress: deliveryData.deliveryAddress,
             estimatedDistance: deliveryData.estimatedDistance,
             estimatedDuration: deliveryData.estimatedDuration,
-            currentLocation: deliveryData.currentLatitude && deliveryData.currentLongitude ? {
-                latitude: parseFloat(deliveryData.currentLatitude),
-                longitude: parseFloat(deliveryData.currentLongitude),
+            currentLocation: deliveryData.pickupLocation ? {
+                latitude: deliveryData.pickupLocation.latitude || 0,
+                longitude: deliveryData.pickupLocation.longitude || 0,
             } : null,
             optimizedRoute: [
                 { step: 1, instruction: `Head to pickup location: ${deliveryData.pickupAddress}` },

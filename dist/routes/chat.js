@@ -34,7 +34,7 @@ router.post('/conversations', auth_1.authenticateToken, async (req, res) => {
             }
         }
         // Check if conversation already exists
-        const existingConversation = await database_1.default.select().from(schema_1.conversations).where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.conversations.customerId, finalCustomerId), (0, drizzle_orm_1.eq)(schema_1.conversations.vendorId, finalVendorId), productId ? (0, drizzle_orm_1.eq)(schema_1.conversations.productId, productId) : undefined).filter(Boolean));
+        const existingConversation = await database_1.default.select().from(schema_1.conversations).where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.conversations.customerId, finalCustomerId), (0, drizzle_orm_1.eq)(schema_1.conversations.vendorId, finalVendorId), productId ? (0, drizzle_orm_1.eq)(schema_1.conversations.productId, productId) : undefined));
         if (existingConversation.length > 0) {
             return res.json({
                 message: 'Conversation already exists',

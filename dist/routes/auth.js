@@ -165,7 +165,7 @@ router.post('/login', (0, fraud_middleware_1.fraudDetectionMiddleware)('LOGIN'),
         }
         const foundUser = user[0];
         // Check password
-        const isPasswordValid = await (0, auth_1.comparePassword)(password, foundUser.password);
+        const isPasswordValid = await (0, auth_1.comparePassword)(password, foundUser.password || '');
         if (!isPasswordValid) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
@@ -318,7 +318,7 @@ router.put('/change-password', auth_1.authenticateToken, (0, fraud_middleware_1.
         }
         const foundUser = user[0];
         // Verify current password
-        const isCurrentPasswordValid = await (0, auth_1.comparePassword)(currentPassword, foundUser.password);
+        const isCurrentPasswordValid = await (0, auth_1.comparePassword)(currentPassword, foundUser.password || '');
         if (!isCurrentPasswordValid) {
             return res.status(400).json({ error: 'Current password is incorrect' });
         }
@@ -456,7 +456,7 @@ router.post('/verify-mfa', async (req, res) => {
         }
         const foundUser = user[0];
         // Check password
-        const isPasswordValid = await (0, auth_1.comparePassword)(password, foundUser.password);
+        const isPasswordValid = await (0, auth_1.comparePassword)(password, foundUser.password || '');
         if (!isPasswordValid) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
@@ -538,7 +538,7 @@ router.post('/disable-mfa', auth_1.authenticateToken, async (req, res) => {
         }
         const foundUser = user[0];
         // Verify current password
-        const isPasswordValid = await (0, auth_1.comparePassword)(password, foundUser.password);
+        const isPasswordValid = await (0, auth_1.comparePassword)(password, foundUser.password || '');
         if (!isPasswordValid) {
             return res.status(400).json({ error: 'Invalid password' });
         }

@@ -608,10 +608,10 @@ router.get('/track/:trackingNumber', async (req, res) => {
       pickupAddress: deliveryData.delivery.pickupAddress,
       deliveryAddress: deliveryData.delivery.deliveryAddress,
       estimatedDuration: deliveryData.delivery.estimatedDuration,
-      currentLocation: deliveryData.delivery.currentLatitude && deliveryData.delivery.currentLongitude ? {
-        latitude: parseFloat(deliveryData.delivery.currentLatitude),
-        longitude: parseFloat(deliveryData.delivery.currentLongitude),
-        address: deliveryData.delivery.currentAddress,
+      currentLocation: deliveryData.delivery.pickupLocation ? {
+        latitude: (deliveryData.delivery.pickupLocation as any).latitude || 0,
+        longitude: (deliveryData.delivery.pickupLocation as any).longitude || 0,
+        address: deliveryData.delivery.pickupAddress,
       } : null,
       driver: deliveryData.driver ? {
         name: deliveryData.driver.fullName,
@@ -620,14 +620,13 @@ router.get('/track/:trackingNumber', async (req, res) => {
       } : null,
       timeline: {
         createdAt: deliveryData.delivery.createdAt,
-        assignedAt: deliveryData.delivery.assignedAt,
-        pickupTime: deliveryData.delivery.pickupTime,
-        deliveryTime: deliveryData.delivery.deliveryTime,
+        scheduledPickupTime: deliveryData.delivery.scheduledPickupTime,
+        actualPickupTime: deliveryData.delivery.actualPickupTime,
+        actualDeliveryTime: deliveryData.delivery.actualDeliveryTime,
       },
       proofOfDelivery: deliveryData.delivery.status === 'DELIVERED' ? {
-        deliveryPhotoUrl: deliveryData.delivery.deliveryPhotoUrl,
-        recipientName: deliveryData.delivery.recipientName,
-        deliveryNotes: deliveryData.delivery.deliveryNotes,
+        proofUrl: deliveryData.delivery.proofOfDelivery,
+        specialInstructions: deliveryData.delivery.specialInstructions,
       } : null,
     });
   } catch (error) {
@@ -794,9 +793,9 @@ router.get('/:id/route', authenticateToken, authorizeRoles('DRIVER'), async (req
       deliveryAddress: deliveryData.deliveryAddress,
       estimatedDistance: deliveryData.estimatedDistance,
       estimatedDuration: deliveryData.estimatedDuration,
-      currentLocation: deliveryData.currentLatitude && deliveryData.currentLongitude ? {
-        latitude: parseFloat(deliveryData.currentLatitude),
-        longitude: parseFloat(deliveryData.currentLongitude),
+      currentLocation: deliveryData.pickupLocation ? {
+        latitude: (deliveryData.pickupLocation as any).latitude || 0,
+        longitude: (deliveryData.pickupLocation as any).longitude || 0,
       } : null,
       optimizedRoute: [
         { step: 1, instruction: `Head to pickup location: ${deliveryData.pickupAddress}` },

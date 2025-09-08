@@ -158,7 +158,7 @@ router.post('/verify-otp', async (req, res) => {
 });
 
 // Login user
-router.post('/login', fraudDetectionMiddleware('LOGIN'), async (req: any, res) => {
+router.post('/login', fraudDetectionMiddleware('LOGIN') as any, async (req: any, res) => {
   try {
     const { email, password } = req.body;
 
@@ -342,7 +342,7 @@ router.post('/reset-password', async (req, res) => {
 });
 
 // Change password (while logged in)
-router.put('/change-password', authenticateToken, fraudDetectionMiddleware('PASSWORD_CHANGE'), async (req: any, res) => {
+router.put('/change-password', authenticateToken, fraudDetectionMiddleware('PASSWORD_CHANGE') as any, async (req: any, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     const userId = (req as any).user.userId;

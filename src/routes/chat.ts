@@ -38,7 +38,7 @@ router.post('/conversations', authenticateToken, async (req, res) => {
       eq(conversations.customerId, finalCustomerId),
       eq(conversations.vendorId, finalVendorId),
       productId ? eq(conversations.productId, productId) : undefined
-    ).filter(Boolean));
+    ));
 
     if (existingConversation.length > 0) {
       return res.json({
