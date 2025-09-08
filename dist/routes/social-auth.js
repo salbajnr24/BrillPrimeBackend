@@ -13,74 +13,78 @@ const schema_1 = require("../schema");
 const auth_1 = require("../utils/auth");
 const mailer_1 = require("../utils/mailer");
 const router = (0, express_1.Router)();
-// Configure Google OAuth Strategy
-passport_1.default.use(new passport_google_oauth20_1.Strategy({
-    clientID: process.env.GOOGLE_CLIENT_ID || '',
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-    callbackURL: "/api/social-auth/google/callback"
-}, async (accessToken, refreshToken, profile, done) => {
-    try {
-        // Check if user exists
-        const existingUser = await database_1.default.select().from(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.email, profile.emails[0].value));
-        if (existingUser.length > 0) {
-            // User exists, return user
-            return done(null, existingUser[0]);
-        }
-        // Create new user
-        const userIdNumber = Math.floor(Math.random() * 900000) + 100000;
-        const userId = `BP-${userIdNumber.toString().padStart(6, '0')}`;
-        const newUser = await database_1.default.insert(schema_1.users).values({
-            userId,
-            fullName: profile.displayName || '',
-            email: profile.emails[0].value,
-            profilePicture: profile.photos[0].value,
-            isVerified: true, // Auto-verify social auth users
-            role: 'CONSUMER',
-            socialAuth: {
-                provider: 'google',
-                providerId: profile.id
+// Configure Google OAuth Strategy (only if credentials are provided)
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+    passport_1.default.use(new passport_google_oauth20_1.Strategy({
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: "/api/social-auth/google/callback"
+    }, async (accessToken, refreshToken, profile, done) => {
+        try {
+            // Check if user exists
+            const existingUser = await database_1.default.select().from(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.email, profile.emails[0].value));
+            if (existingUser.length > 0) {
+                // User exists, return user
+                return done(null, existingUser[0]);
             }
-        }).returning();
-        await (0, mailer_1.sendWelcomeEmail)(newUser[0].email, newUser[0].fullName);
-        return done(null, newUser[0]);
-    }
-    catch (error) {
-        return done(error, null);
-    }
-}));
-// Configure Facebook OAuth Strategy
-passport_1.default.use(new passport_facebook_1.Strategy({
-    clientID: process.env.FACEBOOK_APP_ID || '',
-    clientSecret: process.env.FACEBOOK_APP_SECRET || '',
-    callbackURL: "/api/social-auth/facebook/callback",
-    profileFields: ['id', 'displayName', 'photos', 'email']
-}, async (accessToken, refreshToken, profile, done) => {
-    try {
-        const existingUser = await database_1.default.select().from(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.email, profile.emails[0].value));
-        if (existingUser.length > 0) {
-            return done(null, existingUser[0]);
+            // Create new user
+            const userIdNumber = Math.floor(Math.random() * 900000) + 100000;
+            const userId = `BP-${userIdNumber.toString().padStart(6, '0')}`;
+            const newUser = await database_1.default.insert(schema_1.users).values({
+                userId,
+                fullName: profile.displayName || '',
+                email: profile.emails[0].value,
+                profilePicture: profile.photos[0].value,
+                isVerified: true, // Auto-verify social auth users
+                role: 'CONSUMER',
+                socialAuth: {
+                    provider: 'google',
+                    providerId: profile.id
+                }
+            }).returning();
+            await (0, mailer_1.sendWelcomeEmail)(newUser[0].email, newUser[0].fullName);
+            return done(null, newUser[0]);
         }
-        const userIdNumber = Math.floor(Math.random() * 900000) + 100000;
-        const userId = `BP-${userIdNumber.toString().padStart(6, '0')}`;
-        const newUser = await database_1.default.insert(schema_1.users).values({
-            userId,
-            fullName: profile.displayName || '',
-            email: profile.emails[0].value,
-            profilePicture: profile.photos[0].value,
-            isVerified: true,
-            role: 'CONSUMER',
-            socialAuth: {
-                provider: 'facebook',
-                providerId: profile.id
+        catch (error) {
+            return done(error, null);
+        }
+    }));
+}
+// Configure Facebook OAuth Strategy (only if credentials are provided)
+if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
+    passport_1.default.use(new passport_facebook_1.Strategy({
+        clientID: process.env.FACEBOOK_APP_ID || '',
+        clientSecret: process.env.FACEBOOK_APP_SECRET || '',
+        callbackURL: "/api/social-auth/facebook/callback",
+        profileFields: ['id', 'displayName', 'photos', 'email']
+    }, async (accessToken, refreshToken, profile, done) => {
+        try {
+            const existingUser = await database_1.default.select().from(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.email, profile.emails[0].value));
+            if (existingUser.length > 0) {
+                return done(null, existingUser[0]);
             }
-        }).returning();
-        await (0, mailer_1.sendWelcomeEmail)(newUser[0].email, newUser[0].fullName);
-        return done(null, newUser[0]);
-    }
-    catch (error) {
-        return done(error, null);
-    }
-}));
+            const userIdNumber = Math.floor(Math.random() * 900000) + 100000;
+            const userId = `BP-${userIdNumber.toString().padStart(6, '0')}`;
+            const newUser = await database_1.default.insert(schema_1.users).values({
+                userId,
+                fullName: profile.displayName || '',
+                email: profile.emails[0].value,
+                profilePicture: profile.photos[0].value,
+                isVerified: true,
+                role: 'CONSUMER',
+                socialAuth: {
+                    provider: 'facebook',
+                    providerId: profile.id
+                }
+            }).returning();
+            await (0, mailer_1.sendWelcomeEmail)(newUser[0].email, newUser[0].fullName);
+            return done(null, newUser[0]);
+        }
+        catch (error) {
+            return done(error, null);
+        }
+    }));
+}
 // Google OAuth routes
 router.get('/google', passport_1.default.authenticate('google', { scope: ['profile', 'email'] }));
 router.get('/google/callback', passport_1.default.authenticate('google', { session: false }), (req, res) => {

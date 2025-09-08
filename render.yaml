@@ -4,8 +4,8 @@ services:
     runtime: node
     env: node
     plan: starter
-    buildCommand: npm ci && npm run build
-    startCommand: npm start
+    buildCommand: npm ci
+    startCommand: npm run start:dev
     envVars:
       - key: NODE_ENV
         value: production
