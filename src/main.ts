@@ -1,10 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import passport from 'passport';
-import 'dotenv/config';
+import { createServer } from 'http';
+import { config } from './config/environment';
+import { testDatabaseConnection } from './utils/db-test';
+import { initializeWebSocket } from './utils/websocket';
 
-// Import routes
+// Route imports
 import authRoutes from './routes/auth';
 import adminAuthRoutes from './routes/admin-auth';
 import userRoutes from './routes/users';
@@ -32,7 +34,8 @@ import testEmailRoutes from './routes/test-email'; // Import test email routes
 import testValidationRoutes from './routes/test-validation'; // Import test validation routes
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const server = createServer(app);
+const PORT = config.PORT || 3000;
 
 // Middleware
 app.use(helmet());
@@ -328,20 +331,24 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-// Start server
-app.listen(Number(PORT), '0.0.0.0', async () => {
+// Initialize WebSocket and start server
+initializeWebSocket(server);
+
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 BrillPrime Backend server is running on port ${PORT}`);
   console.log(`📖 API Documentation: http://localhost:${PORT}/api`);
   console.log(`🏥 Health Check: http://localhost:${PORT}/health`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  
+  console.log(`💬 WebSocket server initialized for real-time chat`);
+  console.log(`🌍 Environment: ${config.NODE_ENV}`);
+
   // Test database connection
-  try {
-    const { testDatabaseConnection } = await import('./utils/db-test');
-    await testDatabaseConnection();
-  } catch (error) {
-    console.error('Database connection test failed:', error);
-  }
+  testDatabaseConnection().then(success => {
+    if (success) {
+      console.log('✅ Database connection successful');
+    } else {
+      console.log('❌ Database connection failed');
+    }
+  });
 });
 
 export default app;
