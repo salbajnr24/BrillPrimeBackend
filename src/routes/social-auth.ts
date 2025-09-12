@@ -47,7 +47,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     await sendWelcomeEmail(newUser[0].email, newUser[0].fullName);
     return done(null, newUser[0]);
   } catch (error) {
-    return done(error, null);
+    return done(error, false);
   }
   }));
 }
@@ -86,7 +86,7 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
     await sendWelcomeEmail(newUser[0].email, newUser[0].fullName);
     return done(null, newUser[0]);
   } catch (error) {
-    return done(error, null);
+    return done(error, false);
   }
   }));
 }

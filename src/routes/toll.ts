@@ -65,7 +65,7 @@ const generateQRCode = async (paymentData: any): Promise<string> => {
 // Consumer/Driver: Make toll gate payment
 router.post('/pay', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
     const { 
       locationId, 
       vehicleType, 
@@ -201,7 +201,7 @@ router.post('/pay', authenticateToken, async (req, res) => {
 // Consumer/Driver: Get toll payment history
 router.get('/history', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
     const { page = 1, limit = 20, startDate, endDate } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
@@ -263,7 +263,7 @@ router.get('/history', authenticateToken, async (req, res) => {
 // Consumer/Driver: Get toll payment receipt
 router.get('/:id/receipt', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
     const paymentId = req.params.id;
 
     const payment = await db.select({
@@ -315,7 +315,7 @@ router.get('/:id/receipt', authenticateToken, async (req, res) => {
 });
 
 // Admin/Toll Operators: View all toll payments
-router.get('/transactions', authenticateToken, authorizeRoles(['ADMIN']), async (req, res) => {
+router.get('/transactions', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
   try {
     const { 
       page = 1, 
@@ -404,7 +404,7 @@ router.get('/transactions', authenticateToken, authorizeRoles(['ADMIN']), async 
 });
 
 // Admin/Toll Operators: Get toll usage statistics
-router.get('/stats', authenticateToken, authorizeRoles(['ADMIN']), async (req, res) => {
+router.get('/stats', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
   try {
     const { period = 'daily', locationId, startDate, endDate } = req.query;
 
@@ -491,7 +491,7 @@ router.get('/stats', authenticateToken, authorizeRoles(['ADMIN']), async (req, r
 });
 
 // Admin: Add new toll location
-router.post('/locations', authenticateToken, authorizeRoles(['ADMIN']), async (req, res) => {
+router.post('/locations', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
   try {
     const { 
       name, 
@@ -548,7 +548,7 @@ router.post('/locations', authenticateToken, authorizeRoles(['ADMIN']), async (r
 });
 
 // Admin: Update toll location and pricing
-router.put('/locations/:id', authenticateToken, authorizeRoles(['ADMIN']), async (req, res) => {
+router.put('/locations/:id', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
   try {
     const locationId = req.params.id;
     const { 

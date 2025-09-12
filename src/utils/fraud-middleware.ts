@@ -1,32 +1,21 @@
 
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { FraudDetection, ActivityData } from './fraud-detection';
 
-export interface AuthenticatedRequest extends Request {
-  user?: {
-    userId: number;
-    role: string;
-    email: string;
-  };
-  session?: {
-    id?: string;
-  };
-}
-
-export const fraudDetectionMiddleware = (activityType: string) => {
-  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+export const fraudDetectionMiddleware = (activityType: string): RequestHandler => {
+  return async (req, res, next) => {
     try {
       if (!req.user) {
         return next(); // Skip fraud detection if user is not authenticated
       }
 
       const activityData: ActivityData = {
-        userId: req.user.userId,
+        userId: (req.user as any)!.userId,
         activityType,
         ipAddress: req.ip,
         userAgent: req.get('User-Agent'),
         deviceFingerprint: req.get('X-Device-Fingerprint'), // Custom header from frontend
-        sessionId: req.session?.id || req.headers['x-session-id'] as string,
+        sessionId: (req as any).session?.id || req.headers['x-session-id'] as string,
         metadata: {
           endpoint: req.path,
           method: req.method,

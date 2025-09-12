@@ -51,7 +51,7 @@ export const authenticateToken: RequestHandler = (req, res, next) => {
 export const authorizeRoles = (...roles: string[]): RequestHandler => {
   return (req, res, next) => {
     const user = req.user;
-    if (!user || !roles.includes(user.role as string)) {
+    if (!user || !roles.includes((user as any).role)) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
     next();

@@ -636,10 +636,10 @@ router.post('/payout', auth_1.authenticateToken, (0, auth_1.authorizeRoles)('MER
         else if (userRole === 'DRIVER') {
             // Calculate driver available balance from completed deliveries
             const driverEarnings = await database_1.default.select({
-                totalEarnings: (0, drizzle_orm_1.sql) `sum(${deliveryRequests.deliveryFee})`,
+                totalEarnings: (0, drizzle_orm_1.sql) `sum(${schema_1.deliveryRequests.deliveryFee})`,
             })
-                .from(deliveryRequests)
-                .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(deliveryRequests.driverId, userId), (0, drizzle_orm_1.eq)(deliveryRequests.status, 'DELIVERED')));
+                .from(schema_1.deliveryRequests)
+                .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.deliveryRequests.driverId, userId), (0, drizzle_orm_1.eq)(schema_1.deliveryRequests.status, 'DELIVERED')));
             availableBalance = parseFloat(driverEarnings[0]?.totalEarnings || '0');
         }
         if (amount > availableBalance) {
@@ -668,7 +668,7 @@ router.post('/payout', auth_1.authenticateToken, (0, auth_1.authorizeRoles)('MER
             title: 'Payout Request Submitted',
             message: `Your payout request of ${amount} has been submitted and is pending approval.`,
             type: 'PAYOUT_REQUEST',
-            relatedId: payoutRequest[0].id
+            relatedId: payoutRequest.payoutId
         });
         res.json({
             status: 'Success',

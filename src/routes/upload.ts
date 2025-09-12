@@ -159,7 +159,7 @@ router.delete('/:type/:filename', authenticateToken, async (req: any, res) => {
       await fs.unlink(filePath);
       logger.info(`File deleted: ${filename} of type ${type}`, { userId: (req as any).user?.userId });
       res.json({ message: 'File deleted successfully' });
-    } catch (err) {
+    } catch (err: any) {
       if (err.code === 'ENOENT') {
         logger.warn(`Attempted to delete non-existent file: ${filename}`, { userId: (req as any).user?.userId });
         return res.status(404).json({ error: 'File not found' });
@@ -199,10 +199,10 @@ router.get('/info/:type/:filename', async (req, res) => {
       });
     } catch (err: any) {
       if (err.code === 'ENOENT') {
-        logger.warn(`Attempted to access info for non-existent file: ${filename}`, { userId: req.user?.userId });
+        logger.warn(`Attempted to access info for non-existent file: ${filename}`, { userId: (req as any).user?.userId });
         return res.status(404).json({ error: 'File not found' });
       }
-      logger.error('Get file info error:', { error: err.message, userId: req.user?.userId });
+      logger.error('Get file info error:', { error: err.message, userId: (req as any).user?.userId });
       res.status(500).json({ error: 'Internal server error' });
     }
   } catch (error: any) {
@@ -223,7 +223,7 @@ router.get('/:type/:filename', (req, res) => {
 
   // Check if file exists
   if (!fsSync.existsSync(filePath)) {
-    logger.warn(`Attempted to serve non-existent file: ${filename}`, { userId: req.user?.userId });
+    logger.warn(`Attempted to serve non-existent file: ${filename}`, { userId: (req as any).user?.userId });
     return res.status(404).json({ error: 'File not found' });
   }
 

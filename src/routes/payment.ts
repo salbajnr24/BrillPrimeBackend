@@ -2,7 +2,7 @@ import { Router } from 'express';
 import axios from 'axios';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import db from '../config/database';
-import { users, orders, products, driverProfiles } from '../schema';
+import { users, orders, products, driverProfiles, deliveryRequests } from '../schema';
 import { authenticateToken, authorizeRoles } from '../utils/auth';
 import { createNotification } from './notifications';
 import { fraudDetectionMiddleware, logPaymentMismatch } from '../utils/fraud-middleware';
@@ -769,7 +769,7 @@ router.post('/payout', authenticateToken, authorizeRoles('MERCHANT', 'DRIVER'), 
       title: 'Payout Request Submitted',
       message: `Your payout request of ${amount} has been submitted and is pending approval.`,
       type: 'PAYOUT_REQUEST',
-      relatedId: payoutRequest[0].id
+      relatedId: payoutRequest.payoutId
     });
 
     res.json({
