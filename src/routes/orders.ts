@@ -637,7 +637,7 @@ router.put('/:id/cancel', authenticateToken, async (req, res) => {
     const order = existingOrder[0];
 
     // Only allow cancellation for pending, confirmed, or processing orders
-    if (!['pending', 'confirmed', 'processing'].includes(order.status)) {
+    if (!order.status || !['pending', 'confirmed', 'processing'].includes(order.status)) {
       return res.status(400).json({ error: 'Order cannot be cancelled at this stage' });
     }
 
