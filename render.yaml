@@ -4,8 +4,8 @@ services:
     runtime: node
     env: node
     plan: starter
-    buildCommand: npm ci --include=dev && npm run build
-    startCommand: npm start
+    buildCommand: npm ci --include=dev && npx tsc
+    startCommand: node dist/main.js
     envVars:
       - key: NODE_ENV
         value: production
