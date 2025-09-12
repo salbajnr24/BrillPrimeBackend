@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { eq } from 'drizzle-orm';
 import db from '../config/database';
 import { users } from '../schema';
-import { comparePassword, generateToken } from '../utils/auth';
+import { comparePassword, generateToken, hashPassword } from '../utils/auth';
 import { fraudDetectionMiddleware } from '../utils/fraud-middleware';
 
 const router = Router();
@@ -76,6 +76,62 @@ router.post('/logout', async (req, res) => {
     });
   } catch (error) {
     console.error('Admin logout error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Admin registration endpoint (for creating new admin users)
+router.post('/register', async (req, res) => {
+  try {
+    const { fullName, email, phone, password, adminKey } = req.body;
+
+    if (!fullName || !email || !phone || !password) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    // Check admin registration key (add your secret key in environment)
+    const ADMIN_REGISTRATION_KEY = process.env.ADMIN_REGISTRATION_KEY || 'BP_ADMIN_KEY_2024';
+    if (adminKey !== ADMIN_REGISTRATION_KEY) {
+      return res.status(403).json({ error: 'Invalid admin registration key' });
+    }
+
+    // Check if admin user already exists
+    const existingUser = await db.select().from(users).where(eq(users.email, email));
+    if (existingUser.length > 0) {
+      return res.status(400).json({ error: 'Admin user with this email already exists' });
+    }
+
+    // Generate unique admin user ID
+    const userIdNumber = Math.floor(Math.random() * 900000) + 100000;
+    const userId = `BP-ADMIN-${userIdNumber.toString().padStart(6, '0')}`;
+
+    // Hash password
+    const hashedPassword = await hashPassword(password);
+
+    // Create admin user
+    const newAdmin = await db.insert(users).values({
+      userId,
+      fullName,
+      email,
+      phone,
+      password: hashedPassword,
+      role: 'ADMIN',
+      isVerified: true, // Auto-verify admin users
+    }).returning();
+
+    res.status(201).json({
+      message: 'Admin user registered successfully',
+      admin: {
+        id: newAdmin[0].id,
+        userId: newAdmin[0].userId,
+        fullName: newAdmin[0].fullName,
+        email: newAdmin[0].email,
+        role: newAdmin[0].role,
+      },
+      redirectTo: '/admin/login'
+    });
+  } catch (error) {
+    console.error('Admin registration error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

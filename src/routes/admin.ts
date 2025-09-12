@@ -360,7 +360,7 @@ router.get('/drivers/verification-requests', authenticateToken, authorizeRoles('
   }
 });
 
-// Suspend or activate user account
+// Suspend or activate user account (using isVerified as status flag)
 router.put('/users/:id/status', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
   try {
     const { id } = req.params;
@@ -370,10 +370,11 @@ router.put('/users/:id/status', authenticateToken, authorizeRoles('ADMIN'), asyn
       return res.status(400).json({ error: 'isActive must be a boolean value' });
     }
 
+    // For now, we use isVerified as the status flag since there's no isActive field
+    // In production, you'd want to add an isActive field to the users table
     const updatedUser = await db.update(users)
       .set({ 
-        // Note: We'd need to add an isActive field to users table for this to work
-        // For now, we can use a different approach or add the field to the schema
+        isVerified: isActive // Using verification status as a proxy for active status
       })
       .where(eq(users.id, Number(id)))
       .returning();
@@ -388,6 +389,7 @@ router.put('/users/:id/status', authenticateToken, authorizeRoles('ADMIN'), asyn
         id: updatedUser[0].id,
         fullName: updatedUser[0].fullName,
         email: updatedUser[0].email,
+        isVerified: updatedUser[0].isVerified,
       },
     });
   } catch (error) {

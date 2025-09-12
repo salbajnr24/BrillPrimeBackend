@@ -105,10 +105,10 @@ app.get('/api', (req, res) => {
         'POST /api/auth/resend-otp': 'Resend OTP code',
       },
       adminAuth: {
-        'POST /admin/auth/register': 'Register a new admin user',
+        'POST /admin/auth/register': 'Register a new admin user (requires admin key)',
         'POST /admin/auth/login': 'Login admin user',
-        'POST /admin/auth/verify-otp': 'Verify admin email with OTP',
-        'POST /admin/auth/resend-otp': 'Resend admin OTP code',
+        'POST /admin/auth/logout': 'Logout admin user',
+        'POST /admin/auth/reset-password': 'Reset admin password',
       },
       users: {
         'GET /api/users/profile': 'Get user profile (authenticated)',
