@@ -14,12 +14,14 @@
   "dependencies": {
     "@types/bcrypt": "^6.0.0",
     "@types/express": "^4.17.17",
+    "@types/node": "^20.8.0",
     "@types/passport": "^1.0.17",
     "@types/passport-facebook": "^3.0.3",
     "@types/passport-google-oauth20": "^2.0.16",
     "@types/pdfkit": "^0.17.3",
     "@types/qrcode": "^1.5.5",
     "@types/speakeasy": "^2.0.10",
+    "typescript": "^5.2.2",
     "axios": "^1.6.0",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^2.4.3",
@@ -51,11 +53,9 @@
     "@types/cors": "^2.8.15",
     "@types/jsonwebtoken": "^9.0.5",
     "@types/multer": "^1.4.9",
-    "@types/node": "^20.8.0",
     "@types/nodemailer": "^6.4.14",
     "@types/uuid": "^9.0.6",
     "drizzle-kit": "^0.20.4",
-    "ts-node-dev": "^2.0.0",
-    "typescript": "^5.2.2"
+    "ts-node-dev": "^2.0.0"
   }
 }
