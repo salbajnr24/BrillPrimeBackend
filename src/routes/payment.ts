@@ -15,10 +15,10 @@ const FLUTTERWAVE_BASE_URL = process.env.FLW_BASE_URL || 'https://api.flutterwav
 const FLUTTERWAVE_SECRET_KEY = process.env.FLW_SECRET_KEY;
 
 // Initialize payment
-router.post('/initialize', authenticateToken, async (req, res) => {
+router.post('/initialize', authenticateToken, async (req: any, res) => {
   try {
     const { amount, currency = 'NGN', customerEmail } = req.body;
-    const userId = (req as any).user.userId;
+    const userId = req.user?.userId;
 
     if (!amount || !customerEmail) {
       return res.status(400).json({ error: 'Amount and customer email are required' });
@@ -199,13 +199,17 @@ router.post('/webhook', async (req, res) => {
 });
 
 // Verify payment
-router.post('/verify', authenticateToken, async (req, res) => {
+router.post('/verify', authenticateToken, async (req: any, res) => {
   try {
     const { transactionId, txRef } = req.body;
-    const userId = (req as any).user.userId;
+    const userId = req.user?.userId;
 
     if (!transactionId || !txRef) {
       return res.status(400).json({ error: 'Transaction ID and txRef are required' });
+    }
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User authentication required' });
     }
 
     const paymentStatus = await verifyPayment(transactionId);
@@ -285,14 +289,17 @@ router.post('/verify', authenticateToken, async (req, res) => {
 });
 
 // Process payment for order
-router.post('/process', authenticateToken, fraudDetectionMiddleware('PAYMENT'), async (req, res) => {
+router.post('/process', authenticateToken, fraudDetectionMiddleware('PAYMENT'), async (req: any, res) => {
   try {
     const { orderId, amount, paymentMethod } = req.body;
-    const userId = (req as any).user.userId;
+    const userId = req.user?.userId;
 
     if (!orderId || !amount || !paymentMethod) {
       return res.status(400).json({ error: 'Order ID, amount, and payment method are required' });
     }
+
+    // Generate transaction reference for this payment
+    const txRef = `process-${userId}-${Date.now()}`;
 
     // Fetch order details
     const order = await db.select().from(orders).where(eq(orders.id, orderId));
@@ -338,7 +345,7 @@ router.post('/process', authenticateToken, fraudDetectionMiddleware('PAYMENT'), 
 
     // If payment is successful and amount matches, update order status
     await db.update(orders)
-      .set({ status: 'paid', updatedAt: new Date() })
+      .set({ status: 'confirmed', updatedAt: new Date() })
       .where(eq(orders.id, orderId));
 
     // Notify buyer and seller
@@ -365,7 +372,7 @@ router.post('/process', authenticateToken, fraudDetectionMiddleware('PAYMENT'), 
       data: {
         orderId,
         transactionRef: `txn_${Date.now()}_${orderId}`, // Simulate transaction reference
-        paymentStatus: 'paid',
+        paymentStatus: 'confirmed',
       },
     });
   } catch (error) {
@@ -516,11 +523,11 @@ async function verifyPayment(transactionId: string): Promise<string> {
 }
 
 // Process refund
-router.post('/refund/:id', authenticateToken, async (req, res) => {
+router.post('/refund/:id', authenticateToken, async (req: any, res) => {
   try {
     const { id } = req.params; // This could be order ID or transaction ID
     const { amount, reason, refundType = 'full' } = req.body;
-    const userId = (req as any).user.userId;
+    const userId = req.user?.userId;
 
     if (!reason) {
       return res.status(400).json({ error: 'Refund reason is required' });
@@ -534,7 +541,7 @@ router.post('/refund/:id', authenticateToken, async (req, res) => {
     }
 
     const order = orderData[0];
-    const userRole = (req as any).user.role;
+    const userRole = req.user?.role;
 
     // Check permissions (merchant can refund their orders, admin can refund any)
     if (order.sellerId !== userId && userRole !== 'ADMIN') {
@@ -689,10 +696,10 @@ router.post('/dispute/:id', authenticateToken, async (req, res) => {
 });
 
 // Request payout (merchant/driver)
-router.post('/payout', authenticateToken, authorizeRoles('MERCHANT', 'DRIVER'), fraudDetectionMiddleware('WITHDRAWAL'), async (req, res) => {
+router.post('/payout', authenticateToken, authorizeRoles('MERCHANT', 'DRIVER'), fraudDetectionMiddleware('WITHDRAWAL'), async (req: any, res) => {
   try {
-    const userId = (req as any).user.userId;
-    const userRole = (req as any).user.role;
+    const userId = req.user?.userId;
+    const userRole = req.user?.role;
     const { amount, bankAccount, accountNumber, bankCode, notes } = req.body;
 
     if (!amount || !bankAccount || !accountNumber || !bankCode) {
@@ -777,10 +784,10 @@ router.post('/payout', authenticateToken, authorizeRoles('MERCHANT', 'DRIVER'), 
 });
 
 // Get payout history
-router.get('/payout/history', authenticateToken, async (req, res) => {
+router.get('/payout/history', authenticateToken, async (req: any, res) => {
   try {
-    const userId = (req as any).user.userId;
-    const userRole = (req as any).user.role;
+    const userId = req.user?.userId;
+    const userRole = req.user?.role;
     const { page = 1, limit = 10, status } = req.query;
 
     if (!['MERCHANT', 'DRIVER'].includes(userRole)) {

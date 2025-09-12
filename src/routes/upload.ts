@@ -2,6 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
+import fsSync from 'fs';
 import { authenticateToken } from '../utils/auth';
 import { logger } from '../utils/logger';
 import { validateRequest } from '../utils/validation-middleware';
@@ -73,14 +74,14 @@ const fileInfoSchema = z.object({
 
 
 // Upload single image
-router.post('/image', authenticateToken, imageUpload.single('image'), async (req, res) => {
+router.post('/image', authenticateToken, imageUpload.single('image'), async (req: any, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No image file provided' });
     }
 
     const imageUrl = `/uploads/images/${req.file.filename}`;
-    logger.info(`Image uploaded: ${req.file.filename}`, { userId: req.user?.id });
+    logger.info(`Image uploaded: ${req.file.filename}`, { userId: (req as any).user?.userId });
 
     res.json({
       message: 'Image uploaded successfully',
@@ -90,13 +91,13 @@ router.post('/image', authenticateToken, imageUpload.single('image'), async (req
       size: req.file.size,
     });
   } catch (error) {
-    logger.error('Upload image error:', { error: error.message, userId: req.user?.id });
+    logger.error('Upload image error:', { error: (error as any).message, userId: (req as any).user?.userId });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Upload multiple images
-router.post('/images', authenticateToken, imageUpload.array('images', 5), async (req, res) => {
+router.post('/images', authenticateToken, imageUpload.array('images', 5), async (req: any, res) => {
   try {
     if (!req.files || (req.files as Express.Multer.File[]).length === 0) {
       return res.status(400).json({ error: 'No image files provided' });
@@ -109,27 +110,27 @@ router.post('/images', authenticateToken, imageUpload.array('images', 5), async 
       originalName: file.originalname,
       size: file.size,
     }));
-    logger.info(`${files.length} images uploaded`, { userId: req.user?.id });
+    logger.info(`${files.length} images uploaded`, { userId: (req as any).user?.userId });
 
     res.json({
       message: 'Images uploaded successfully',
       images: uploadedImages,
     });
   } catch (error) {
-    logger.error('Upload images error:', { error: error.message, userId: req.user?.id });
+    logger.error('Upload images error:', { error: (error as any).message, userId: (req as any).user?.userId });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Upload document
-router.post('/document', authenticateToken, documentUpload.single('document'), async (req, res) => {
+router.post('/document', authenticateToken, documentUpload.single('document'), async (req: any, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No document file provided' });
     }
 
     const documentUrl = `/uploads/documents/${req.file.filename}`;
-    logger.info(`Document uploaded: ${req.file.filename}`, { userId: req.user?.id });
+    logger.info(`Document uploaded: ${req.file.filename}`, { userId: (req as any).user?.userId });
 
     res.json({
       message: 'Document uploaded successfully',
@@ -140,13 +141,13 @@ router.post('/document', authenticateToken, documentUpload.single('document'), a
       mimetype: req.file.mimetype,
     });
   } catch (error) {
-    logger.error('Upload document error:', { error: error.message, userId: req.user?.id });
+    logger.error('Upload document error:', { error: (error as any).message, userId: (req as any).user?.userId });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Delete uploaded file
-router.delete('/:type/:filename', authenticateToken, validateRequest(fileInfoSchema), async (req, res) => {
+router.delete('/:type/:filename', authenticateToken, async (req: any, res) => {
   try {
     const { type, filename } = req.params;
 
@@ -156,20 +157,20 @@ router.delete('/:type/:filename', authenticateToken, validateRequest(fileInfoSch
     try {
       await fs.access(filePath);
       await fs.unlink(filePath);
-      logger.info(`File deleted: ${filename} of type ${type}`, { userId: req.user?.id });
+      logger.info(`File deleted: ${filename} of type ${type}`, { userId: (req as any).user?.userId });
       res.json({ message: 'File deleted successfully' });
     } catch (err) {
       if (err.code === 'ENOENT') {
-        logger.warn(`Attempted to delete non-existent file: ${filename}`, { userId: req.user?.id });
+        logger.warn(`Attempted to delete non-existent file: ${filename}`, { userId: (req as any).user?.userId });
         return res.status(404).json({ error: 'File not found' });
       }
-      logger.error('Delete file error:', { error: err.message, userId: req.user?.id });
+      logger.error('Delete file error:', { error: (err as any).message, userId: (req as any).user?.userId });
       res.status(500).json({ error: 'Internal server error' });
     }
   } catch (error) {
     // This catch block is for validation errors from validateRequest
-    logger.error('Delete file request validation error:', { error: error.message });
-    res.status(400).json({ error: error.errors || 'Invalid request parameters' });
+    logger.error('Delete file request validation error:', { error: (error as any).message });
+    res.status(400).json({ error: (error as any).errors || 'Invalid request parameters' });
   }
 });
 
@@ -187,7 +188,7 @@ router.get('/info/:type/:filename', async (req, res) => {
     // Check if file exists
     try {
       const stats = await fs.stat(filePath);
-      logger.info(`File info requested: ${filename}`, { userId: req.user?.id });
+      logger.info(`File info requested: ${filename}`, { userId: (req as any).user?.userId });
 
       res.json({
         filename,
@@ -196,15 +197,15 @@ router.get('/info/:type/:filename', async (req, res) => {
         created: stats.birthtime,
         modified: stats.mtime,
       });
-    } catch (err) {
+    } catch (err: any) {
       if (err.code === 'ENOENT') {
-        logger.warn(`Attempted to access info for non-existent file: ${filename}`, { userId: req.user?.id });
+        logger.warn(`Attempted to access info for non-existent file: ${filename}`, { userId: req.user?.userId });
         return res.status(404).json({ error: 'File not found' });
       }
-      logger.error('Get file info error:', { error: err.message, userId: req.user?.id });
+      logger.error('Get file info error:', { error: err.message, userId: req.user?.userId });
       res.status(500).json({ error: 'Internal server error' });
     }
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Get file info request validation error:', { error: error.message });
     res.status(400).json({ error: error.errors || 'Invalid request parameters' });
   }
@@ -221,8 +222,8 @@ router.get('/:type/:filename', (req, res) => {
   const filePath = path.join('uploads', type, filename);
 
   // Check if file exists
-  if (!fs.existsSync(filePath)) {
-    logger.warn(`Attempted to serve non-existent file: ${filename}`, { userId: req.user?.id });
+  if (!fsSync.existsSync(filePath)) {
+    logger.warn(`Attempted to serve non-existent file: ${filename}`, { userId: req.user?.userId });
     return res.status(404).json({ error: 'File not found' });
   }
 

@@ -275,10 +275,16 @@ router.get('/transactions', auth_1.authenticateToken, (0, auth_1.authorizeRoles)
             whereClause = (0, drizzle_orm_1.and)(whereClause, (0, drizzle_orm_1.eq)(schema_1.tollPayments.locationId, Number(locationId)));
         }
         if (vehicleType) {
-            whereClause = (0, drizzle_orm_1.and)(whereClause, (0, drizzle_orm_1.eq)(schema_1.tollPayments.vehicleType, vehicleType));
+            const validVehicleTypes = ['MOTORCYCLE', 'CAR', 'TRUCK', 'BUS', 'TRAILER'];
+            if (validVehicleTypes.includes(vehicleType)) {
+                whereClause = (0, drizzle_orm_1.and)(whereClause, (0, drizzle_orm_1.eq)(schema_1.tollPayments.vehicleType, vehicleType));
+            }
         }
         if (status) {
-            whereClause = (0, drizzle_orm_1.and)(whereClause, (0, drizzle_orm_1.eq)(schema_1.tollPayments.status, status));
+            const validStatuses = ['PENDING', 'CANCELLED', 'SUCCESSFUL', 'FAILED'];
+            if (validStatuses.includes(status)) {
+                whereClause = (0, drizzle_orm_1.and)(whereClause, (0, drizzle_orm_1.eq)(schema_1.tollPayments.status, status));
+            }
         }
         if (startDate && endDate) {
             whereClause = (0, drizzle_orm_1.and)(whereClause, (0, drizzle_orm_1.gte)(schema_1.tollPayments.createdAt, new Date(startDate)), (0, drizzle_orm_1.lte)(schema_1.tollPayments.createdAt, new Date(endDate)));

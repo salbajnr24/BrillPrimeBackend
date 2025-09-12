@@ -16,6 +16,6 @@
     "strictPropertyInitialization": false,
     "sourceMap": true
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "attached_assets", "uploads", "**/*.map"]
 }

@@ -334,10 +334,16 @@ router.get('/transactions', authenticateToken, authorizeRoles(['ADMIN']), async 
       whereClause = and(whereClause, eq(tollPayments.locationId, Number(locationId)));
     }
     if (vehicleType) {
-      whereClause = and(whereClause, eq(tollPayments.vehicleType, vehicleType as string));
+      const validVehicleTypes = ['MOTORCYCLE', 'CAR', 'TRUCK', 'BUS', 'TRAILER'];
+      if (validVehicleTypes.includes(vehicleType as string)) {
+        whereClause = and(whereClause, eq(tollPayments.vehicleType, vehicleType as any));
+      }
     }
     if (status) {
-      whereClause = and(whereClause, eq(tollPayments.status, status as string));
+      const validStatuses = ['PENDING', 'CANCELLED', 'SUCCESSFUL', 'FAILED'];
+      if (validStatuses.includes(status as string)) {
+        whereClause = and(whereClause, eq(tollPayments.status, status as any));
+      }
     }
     if (startDate && endDate) {
       whereClause = and(
