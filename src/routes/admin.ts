@@ -13,7 +13,7 @@ import {
   identityVerifications,
   driverVerifications
 } from '../schema';
-import { authenticateToken, authorizeRoles } from '../utils/auth';
+import { authenticateToken, authorizeRoles, hashPassword } from '../utils/auth';
 
 const router = Router();
 
@@ -401,6 +401,55 @@ router.get('/system/health', authenticateToken, authorizeRoles('ADMIN'), async (
     });
   } catch (error) {
     console.error('Get system health error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Create admin user (super admin only or initial setup)
+router.post('/create-admin', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+  try {
+    const { fullName, email, phone, password } = req.body;
+
+    if (!fullName || !email || !phone || !password) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    // Check if user already exists
+    const existingUser = await db.select().from(users).where(eq(users.email, email));
+    if (existingUser.length > 0) {
+      return res.status(400).json({ error: 'User with this email already exists' });
+    }
+
+    // Generate unique user ID
+    const userIdNumber = Math.floor(Math.random() * 900000) + 100000;
+    const userId = `BP-ADMIN-${userIdNumber.toString().padStart(6, '0')}`;
+
+    // Hash password
+    const hashedPassword = await hashPassword(password);
+
+    // Create admin user
+    const newAdmin = await db.insert(users).values({
+      userId,
+      fullName,
+      email,
+      phone,
+      password: hashedPassword,
+      role: 'ADMIN',
+      isVerified: true, // Auto-verify admin users
+    }).returning();
+
+    res.status(201).json({
+      message: 'Admin user created successfully',
+      admin: {
+        id: newAdmin[0].id,
+        userId: newAdmin[0].userId,
+        fullName: newAdmin[0].fullName,
+        email: newAdmin[0].email,
+        role: newAdmin[0].role,
+      },
+    });
+  } catch (error) {
+    console.error('Create admin error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
