@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { eq, and, like, desc } from 'drizzle-orm';
+import { eq, and, like, desc, or, sql } from 'drizzle-orm';
 import db from '../config/database';
 import { users, merchantProfiles, driverProfiles, userLocations } from '../schema';
 import { authenticateToken, authorizeRoles } from '../utils/auth';

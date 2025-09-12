@@ -1,6 +1,6 @@
 
 import { Router } from 'express';
-import { eq, and, desc, sql, gte, lte } from 'drizzle-orm';
+import { eq, and, desc, sql, gte, lte, alias } from 'drizzle-orm';
 import db from '../config/database';
 import { 
   fuelInventory, 
@@ -691,7 +691,7 @@ router.get('/deliveries', authenticateToken, authorizeRoles('DRIVER'), async (re
     })
       .from(fuelOrders)
       .leftJoin(users, eq(fuelOrders.customerId, users.id))
-      .leftJoin(users.as('merchant'), eq(fuelOrders.merchantId, users.id))
+      .leftJoin(alias(users, 'merchant'), eq(fuelOrders.merchantId, users.id))
       .leftJoin(merchantProfiles, eq(fuelOrders.merchantId, merchantProfiles.userId))
       .where(and(...whereConditions))
       .orderBy(desc(fuelOrders.createdAt))
