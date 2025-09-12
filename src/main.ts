@@ -1,8 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import passport from 'passport';
 import { createServer } from 'http';
-import { config } from './config/environment';
+import { PORT } from './config/environment';
 import { testDatabaseConnection } from './utils/db-test';
 import { initializeWebSocket } from './utils/websocket';
 
@@ -35,7 +36,7 @@ import testValidationRoutes from './routes/test-validation'; // Import test vali
 
 const app = express();
 const server = createServer(app);
-const PORT = config.PORT || 3000;
+const serverPort = PORT || 3000;
 
 // Middleware
 app.use(helmet());
@@ -334,12 +335,12 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 // Initialize WebSocket and start server
 initializeWebSocket(server);
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 BrillPrime Backend server is running on port ${PORT}`);
-  console.log(`📖 API Documentation: http://localhost:${PORT}/api`);
-  console.log(`🏥 Health Check: http://localhost:${PORT}/health`);
+server.listen(serverPort, '0.0.0.0', () => {
+  console.log(`🚀 BrillPrime Backend server is running on port ${serverPort}`);
+  console.log(`📖 API Documentation: http://localhost:${serverPort}/api`);
+  console.log(`🏥 Health Check: http://localhost:${serverPort}/health`);
   console.log(`💬 WebSocket server initialized for real-time chat`);
-  console.log(`🌍 Environment: ${config.NODE_ENV}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 
   // Test database connection
   testDatabaseConnection().then(success => {
