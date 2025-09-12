@@ -28,6 +28,7 @@ import reportsRoutes from './routes/reports';
 import fuelRoutes from './routes/fuel'; // Import fuel routes
 import tollRoutes from './routes/toll'; // Import toll routes
 import testEmailRoutes from './routes/test-email'; // Import test email routes
+import testValidationRoutes from './routes/test-validation'; // Import test validation routes
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -88,7 +89,7 @@ app.use('/api/report', reportsRoutes);
 app.use('/api/fuel', fuelRoutes); // Register fuel routes
 app.use('/api/toll', tollRoutes); // Register toll routes
 app.use('/api/test-email', testEmailRoutes); // Register test email routes
-app.use('/api/test-validation', require('./routes/test-validation').default); // Register validation test routes
+app.use('/api/test-validation', testValidationRoutes); // Register validation test routes
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
