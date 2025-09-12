@@ -89,12 +89,15 @@ router.post('/pay', auth_1.authenticateToken, async (req, res) => {
             .from(schema_1.tollLocations)
             .leftJoin(schema_1.tollPricing, (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.tollPricing.locationId, schema_1.tollLocations.id), (0, drizzle_orm_1.eq)(schema_1.tollPricing.vehicleType, vehicleType), (0, drizzle_orm_1.eq)(schema_1.tollPricing.isActive, true)))
             .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.tollLocations.id, locationId), (0, drizzle_orm_1.eq)(schema_1.tollLocations.isActive, true)));
-        if (!tollData.length || !tollData[0].pricing.price) {
+        if (!tollData.length || !tollData[0].pricing || tollData[0].pricing.price == null) {
             return res.status(404).json({
                 error: 'Toll location not found or pricing not available for this vehicle type'
             });
         }
         const { location, pricing } = tollData[0];
+        if (!pricing) {
+            return res.status(404).json({ error: 'Pricing information not available' });
+        }
         const paymentReference = `TOLL_${Date.now()}_${crypto_1.default.randomBytes(8).toString('hex')}`;
         const receiptNumber = generateReceiptNumber();
         // Create toll payment record
@@ -136,7 +139,9 @@ router.post('/pay', auth_1.authenticateToken, async (req, res) => {
         })
             .where((0, drizzle_orm_1.eq)(schema_1.tollPayments.id, payment.id));
         // Create notification for user
-        await (0, notifications_1.createNotification)(userId, 'CONSUMER', {
+        await (0, notifications_1.createNotification)({
+            userId,
+            userRole: 'CONSUMER',
             title: 'Toll Payment Successful',
             message: `Your toll payment of ₦${pricing.price} at ${location.name} has been processed successfully.`,
             type: 'PAYMENT',
