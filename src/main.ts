@@ -88,6 +88,7 @@ app.use('/api/report', reportsRoutes);
 app.use('/api/fuel', fuelRoutes); // Register fuel routes
 app.use('/api/toll', tollRoutes); // Register toll routes
 app.use('/api/test-email', testEmailRoutes); // Register test email routes
+app.use('/api/test-validation', require('./routes/test-validation').default); // Register validation test routes
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
