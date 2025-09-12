@@ -27,6 +27,7 @@ import socialAuthRoutes from './routes/social-auth';
 import reportsRoutes from './routes/reports';
 import fuelRoutes from './routes/fuel'; // Import fuel routes
 import tollRoutes from './routes/toll'; // Import toll routes
+import testEmailRoutes from './routes/test-email'; // Import test email routes
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -86,6 +87,7 @@ app.use('/api/social-auth', socialAuthRoutes);
 app.use('/api/report', reportsRoutes);
 app.use('/api/fuel', fuelRoutes); // Register fuel routes
 app.use('/api/toll', tollRoutes); // Register toll routes
+app.use('/api/test-email', testEmailRoutes); // Register test email routes
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
@@ -269,6 +271,9 @@ app.get('/api', (req, res) => {
         'POST /api/toll/locations': 'Add new toll location (admin only)',
         'PUT /api/toll/locations/:id': 'Update toll pricing/location info (admin only)',
         'GET /api/toll/locations': 'Get all toll locations (public)',
+      },
+      testEmail: {
+        'POST /api/test-email': 'Send a test email using Gmail SMTP',
       },
       trustSafety: {
         'POST /api/report/user/:id': 'Report a user for abuse, scam, etc.',
