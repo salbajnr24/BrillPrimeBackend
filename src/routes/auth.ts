@@ -191,6 +191,24 @@ router.post('/login', fraudDetectionMiddleware('LOGIN') as any, async (req: any,
       role: foundUser.role as 'CONSUMER' | 'MERCHANT' | 'DRIVER',
     });
 
+    // Determine redirect URL based on user role
+    const getRoleRedirect = (role: string) => {
+      switch (role) {
+        case 'CONSUMER':
+          return '/consumer/dashboard';
+        case 'MERCHANT':
+          return '/merchant/dashboard';
+        case 'DRIVER':
+          return '/driver/dashboard';
+        case 'VENDOR':
+          return '/vendor/dashboard';
+        case 'ADMIN':
+          return '/admin/dashboard'; // Fallback, but admins should use /admin/auth/login
+        default:
+          return '/dashboard';
+      }
+    };
+
     res.json({
       message: 'Login successful',
       token,
@@ -202,6 +220,7 @@ router.post('/login', fraudDetectionMiddleware('LOGIN') as any, async (req: any,
         role: foundUser.role,
         isVerified: foundUser.isVerified,
       },
+      redirectTo: getRoleRedirect(foundUser.role),
     });
   } catch (error) {
     console.error('Login error:', error);

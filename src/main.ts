@@ -6,6 +6,7 @@ import 'dotenv/config';
 
 // Import routes
 import authRoutes from './routes/auth';
+import adminAuthRoutes from './routes/admin-auth';
 import userRoutes from './routes/users';
 import productRoutes from './routes/products';
 import cartRoutes from './routes/cart';
@@ -67,6 +68,7 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/admin/auth', adminAuthRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
@@ -101,6 +103,12 @@ app.get('/api', (req, res) => {
         'POST /api/auth/login': 'Login user',
         'POST /api/auth/verify-otp': 'Verify email with OTP',
         'POST /api/auth/resend-otp': 'Resend OTP code',
+      },
+      adminAuth: {
+        'POST /admin/auth/register': 'Register a new admin user',
+        'POST /admin/auth/login': 'Login admin user',
+        'POST /admin/auth/verify-otp': 'Verify admin email with OTP',
+        'POST /admin/auth/resend-otp': 'Resend admin OTP code',
       },
       users: {
         'GET /api/users/profile': 'Get user profile (authenticated)',

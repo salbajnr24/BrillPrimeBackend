@@ -17,6 +17,56 @@ import { authenticateToken, authorizeRoles, hashPassword } from '../utils/auth';
 
 const router = Router();
 
+// Admin dashboard endpoint
+router.get('/dashboard', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+  try {
+    const adminUser = (req as any).user;
+
+    // Get dashboard overview data
+    const [
+      totalUsers,
+      totalOrders,
+      totalRevenue,
+      pendingVerifications
+    ] = await Promise.all([
+      db.select({
+        count: sql<number>`count(*)`.mapWith(Number),
+      }).from(users),
+
+      db.select({
+        count: sql<number>`count(*)`.mapWith(Number),
+      }).from(orders),
+
+      db.select({
+        revenue: sql<string>`sum(${orders.totalPrice})`,
+      }).from(orders).where(eq(orders.status, 'delivered')),
+
+      db.select({
+        count: sql<number>`count(*)`.mapWith(Number),
+      }).from(driverVerifications).where(eq(driverVerifications.verificationStatus, 'PENDING')),
+    ]);
+
+    res.json({
+      message: 'Admin dashboard loaded successfully',
+      admin: {
+        id: adminUser.userId,
+        email: adminUser.email,
+        role: adminUser.role,
+      },
+      overview: {
+        totalUsers: totalUsers[0]?.count || 0,
+        totalOrders: totalOrders[0]?.count || 0,
+        totalRevenue: parseFloat(totalRevenue[0]?.revenue || '0'),
+        pendingVerifications: pendingVerifications[0]?.count || 0,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Admin dashboard error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get all users with filters
 router.get('/users', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
   try {
