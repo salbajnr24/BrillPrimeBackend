@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const drizzle_orm_1 = require("drizzle-orm");
+const axios_1 = __importDefault(require("axios"));
 const database_1 = __importDefault(require("../config/database"));
 const schema_1 = require("../schema");
 const auth_1 = require("../utils/auth");
@@ -441,7 +442,7 @@ router.patch('/verify-order', auth_1.authenticateToken, async (req, res) => {
             if (paymentStatus === 'successful') {
                 try {
                     // Call receipt generation API internally
-                    const receiptResponse = await axios.post('http://localhost:3000/api/receipts/generate', {
+                    const receiptResponse = await axios_1.default.post('http://localhost:3000/api/receipts/generate', {
                         orderId: pendingOrder.id,
                         paymentMethod: 'card', // Default, can be updated based on actual payment method
                         transactionRef: txRef,
@@ -565,7 +566,7 @@ router.put('/:id/cancel', auth_1.authenticateToken, async (req, res) => {
         }
         const order = existingOrder[0];
         // Only allow cancellation for pending, confirmed, or processing orders
-        if (!['pending', 'confirmed', 'processing'].includes(order.status)) {
+        if (!order.status || !['pending', 'confirmed', 'processing'].includes(order.status)) {
             return res.status(400).json({ error: 'Order cannot be cancelled at this stage' });
         }
         const updatedOrder = await database_1.default.update(schema_1.orders)

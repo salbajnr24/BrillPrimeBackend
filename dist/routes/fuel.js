@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const drizzle_orm_1 = require("drizzle-orm");
+const pg_core_1 = require("drizzle-orm/pg-core");
 const database_1 = __importDefault(require("../config/database"));
 const schema_1 = require("../schema");
 const auth_1 = require("../utils/auth");
@@ -261,7 +262,7 @@ router.put('/orders/:id/cancel', auth_1.authenticateToken, async (req, res) => {
         }
         const order = existingOrder[0];
         // Only allow cancellation for pending, confirmed orders
-        if (!['PENDING', 'CONFIRMED'].includes(order.status)) {
+        if (!order.status || !['PENDING', 'CONFIRMED'].includes(order.status)) {
             return res.status(400).json({
                 error: 'Order cannot be cancelled at this stage'
             });
@@ -593,7 +594,7 @@ router.get('/deliveries', auth_1.authenticateToken, (0, auth_1.authorizeRoles)('
         })
             .from(schema_1.fuelOrders)
             .leftJoin(schema_1.users, (0, drizzle_orm_1.eq)(schema_1.fuelOrders.customerId, schema_1.users.id))
-            .leftJoin(schema_1.users.as('merchant'), (0, drizzle_orm_1.eq)(schema_1.fuelOrders.merchantId, schema_1.users.id))
+            .leftJoin((0, pg_core_1.alias)(schema_1.users, 'merchant'), (0, drizzle_orm_1.eq)(schema_1.fuelOrders.merchantId, schema_1.users.id))
             .leftJoin(schema_1.merchantProfiles, (0, drizzle_orm_1.eq)(schema_1.fuelOrders.merchantId, schema_1.merchantProfiles.userId))
             .where((0, drizzle_orm_1.and)(...whereConditions))
             .orderBy((0, drizzle_orm_1.desc)(schema_1.fuelOrders.createdAt))

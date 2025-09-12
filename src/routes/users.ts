@@ -126,15 +126,43 @@ router.get('/merchants', async (req, res) => {
       .limit(Number(limit))
       .offset(offset);
 
+    let finalQuery = query;
     if (search) {
-      query = query.where(and(
-        eq(users.role, 'MERCHANT'),
-        eq(users.isVerified, true),
-        like(users.fullName, `%${search}%`)
-      ));
+      finalQuery = db.select({
+        id: users.id,
+        userId: users.userId,
+        fullName: users.fullName,
+        email: users.email,
+        profilePicture: users.profilePicture,
+        city: users.city,
+        state: users.state,
+        isVerified: users.isVerified,
+        merchantProfile: {
+          businessName: merchantProfiles.businessName,
+          businessType: merchantProfiles.businessType,
+          businessDescription: merchantProfiles.businessDescription,
+          businessLogo: merchantProfiles.businessLogo,
+          rating: merchantProfiles.rating,
+          reviewCount: merchantProfiles.reviewCount,
+          totalSales: merchantProfiles.totalSales,
+          totalOrders: merchantProfiles.totalOrders,
+          isVerified: merchantProfiles.isVerified,
+          subscriptionTier: merchantProfiles.subscriptionTier,
+        },
+      })
+        .from(users)
+        .leftJoin(merchantProfiles, eq(users.id, merchantProfiles.userId))
+        .where(and(
+          eq(users.role, 'MERCHANT'),
+          eq(users.isVerified, true),
+          like(users.fullName, `%${search}%`)
+        ))
+        .orderBy(desc(merchantProfiles.rating))
+        .limit(Number(limit))
+        .offset(offset);
     }
 
-    const merchants = await query;
+    const merchants = await finalQuery;
 
     res.json({
       merchants,
@@ -478,9 +506,9 @@ router.get('/search', async (req, res) => {
       .filter(user => user.role === 'MERCHANT')
       .map(user => user.id);
 
-    let merchantProfiles = [];
+    let merchantProfilesData: any[] = [];
     if (merchantIds.length > 0) {
-      merchantProfiles = await db.select({
+      merchantProfilesData = await db.select({
         userId: merchantProfiles.userId,
         businessName: merchantProfiles.businessName,
         businessType: merchantProfiles.businessType,
@@ -511,7 +539,7 @@ router.get('/search', async (req, res) => {
 
       // Add merchant info if applicable
       if (user.role === 'MERCHANT') {
-        const merchantProfile = merchantProfiles.find(mp => mp.userId === user.id);
+        const merchantProfile = merchantProfilesData.find(mp => mp.userId === user.id);
         if (merchantProfile) {
           result.merchantInfo = {
             businessName: merchantProfile.businessName,

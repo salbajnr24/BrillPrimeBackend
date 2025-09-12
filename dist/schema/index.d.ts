@@ -219,6 +219,18 @@ export declare const users: import("drizzle-orm/pg-core").PgTableWithColumns<{
             enumValues: [string, ...string[]];
             baseColumn: never;
         }, {}, {}>;
+        bio: import("drizzle-orm/pg-core").PgColumn<{
+            name: "bio";
+            tableName: "users";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+        }, {}, {}>;
         socialAuth: import("drizzle-orm/pg-core").PgColumn<{
             name: "social_auth";
             tableName: "users";
@@ -5856,6 +5868,7 @@ export declare const insertUserSchema: z.ZodObject<{
     latitude: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     longitude: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     address: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    bio: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     socialAuth: z.ZodOptional<z.ZodNullable<z.ZodType<string | number | boolean | {
         [key: string]: string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | /*elided*/ any | null)[] | null)[] | null)[] | null)[] | null)[] | null)[] | null)[] | null)[] | null)[] | null)[] | null)[] | null;
     } | (string | number | boolean | {
@@ -5927,6 +5940,7 @@ export declare const insertUserSchema: z.ZodObject<{
     latitude?: string | null | undefined;
     longitude?: string | null | undefined;
     address?: string | null | undefined;
+    bio?: string | null | undefined;
     socialAuth?: (string | number | boolean | {
         [key: string]: string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | /*elided*/ any | null)[] | null)[] | null)[] | null)[] | null)[] | null)[] | null)[] | null)[] | null)[] | null)[] | null)[] | null;
     } | (string | number | boolean | {
@@ -5974,6 +5988,7 @@ export declare const insertUserSchema: z.ZodObject<{
     latitude?: string | null | undefined;
     longitude?: string | null | undefined;
     address?: string | null | undefined;
+    bio?: string | null | undefined;
     socialAuth?: (string | number | boolean | {
         [key: string]: string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | (string | number | boolean | /*elided*/ any | /*elided*/ any | null)[] | null)[] | null)[] | null)[] | null)[] | null)[] | null)[] | null)[] | null)[] | null)[] | null)[] | null;
     } | (string | number | boolean | {

@@ -1,6 +1,7 @@
 
 import { Router } from 'express';
-import { eq, and, desc, sql, gte, lte, alias } from 'drizzle-orm';
+import { eq, and, desc, sql, gte, lte } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import db from '../config/database';
 import { 
   fuelInventory, 
