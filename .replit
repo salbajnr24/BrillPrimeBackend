@@ -31,7 +31,7 @@ localPort = 3000
 externalPort = 3000
 
 [[ports]]
-localPort = 37365
+localPort = 36623
 externalPort = 80
 
 [nix]
