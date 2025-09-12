@@ -1,6 +1,10 @@
 
 import { Router } from 'express';
 import { eq } from 'drizzle-orm';
+import { users } from '../schema';
+import { hashPassword, comparePassword, generateToken } from '../utils/auth';
+import db from '../config/database';
+import { eq } from 'drizzle-orm';
 import db from '../config/database';
 import { users } from '../schema';
 import { comparePassword, generateToken, hashPassword } from '../utils/auth';

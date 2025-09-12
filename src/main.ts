@@ -329,11 +329,19 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 // Start server
-app.listen(Number(PORT), '0.0.0.0', () => {
+app.listen(Number(PORT), '0.0.0.0', async () => {
   console.log(`🚀 BrillPrime Backend server is running on port ${PORT}`);
   console.log(`📖 API Documentation: http://localhost:${PORT}/api`);
   console.log(`🏥 Health Check: http://localhost:${PORT}/health`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  
+  // Test database connection
+  try {
+    const { testDatabaseConnection } = await import('./utils/db-test');
+    await testDatabaseConnection();
+  } catch (error) {
+    console.error('Database connection test failed:', error);
+  }
 });
 
 export default app;
