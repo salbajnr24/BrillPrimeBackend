@@ -13,9 +13,59 @@ import {
   identityVerifications,
   driverVerifications
 } from '../schema';
-import { authenticateToken, authorizeRoles } from '../utils/auth';
+import { authenticateToken, authorizeRoles, hashPassword } from '../utils/auth';
 
 const router = Router();
+
+// Admin dashboard endpoint
+router.get('/dashboard', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+  try {
+    const adminUser = (req as any).user;
+
+    // Get dashboard overview data
+    const [
+      totalUsers,
+      totalOrders,
+      totalRevenue,
+      pendingVerifications
+    ] = await Promise.all([
+      db.select({
+        count: sql<number>`count(*)`.mapWith(Number),
+      }).from(users),
+
+      db.select({
+        count: sql<number>`count(*)`.mapWith(Number),
+      }).from(orders),
+
+      db.select({
+        revenue: sql<string>`sum(${orders.totalPrice})`,
+      }).from(orders).where(eq(orders.status, 'delivered')),
+
+      db.select({
+        count: sql<number>`count(*)`.mapWith(Number),
+      }).from(driverVerifications).where(eq(driverVerifications.verificationStatus, 'PENDING')),
+    ]);
+
+    res.json({
+      message: 'Admin dashboard loaded successfully',
+      admin: {
+        id: adminUser.userId,
+        email: adminUser.email,
+        role: adminUser.role,
+      },
+      overview: {
+        totalUsers: totalUsers[0]?.count || 0,
+        totalOrders: totalOrders[0]?.count || 0,
+        totalRevenue: parseFloat(totalRevenue[0]?.revenue || '0'),
+        pendingVerifications: pendingVerifications[0]?.count || 0,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Admin dashboard error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // Get all users with filters
 router.get('/users', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
@@ -310,7 +360,7 @@ router.get('/drivers/verification-requests', authenticateToken, authorizeRoles('
   }
 });
 
-// Suspend or activate user account
+// Suspend or activate user account (using isVerified as status flag)
 router.put('/users/:id/status', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
   try {
     const { id } = req.params;
@@ -320,10 +370,11 @@ router.put('/users/:id/status', authenticateToken, authorizeRoles('ADMIN'), asyn
       return res.status(400).json({ error: 'isActive must be a boolean value' });
     }
 
+    // For now, we use isVerified as the status flag since there's no isActive field
+    // In production, you'd want to add an isActive field to the users table
     const updatedUser = await db.update(users)
       .set({ 
-        // Note: We'd need to add an isActive field to users table for this to work
-        // For now, we can use a different approach or add the field to the schema
+        isVerified: isActive // Using verification status as a proxy for active status
       })
       .where(eq(users.id, Number(id)))
       .returning();
@@ -338,6 +389,7 @@ router.put('/users/:id/status', authenticateToken, authorizeRoles('ADMIN'), asyn
         id: updatedUser[0].id,
         fullName: updatedUser[0].fullName,
         email: updatedUser[0].email,
+        isVerified: updatedUser[0].isVerified,
       },
     });
   } catch (error) {
@@ -401,6 +453,55 @@ router.get('/system/health', authenticateToken, authorizeRoles('ADMIN'), async (
     });
   } catch (error) {
     console.error('Get system health error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Create admin user (super admin only or initial setup)
+router.post('/create-admin', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+  try {
+    const { fullName, email, phone, password } = req.body;
+
+    if (!fullName || !email || !phone || !password) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    // Check if user already exists
+    const existingUser = await db.select().from(users).where(eq(users.email, email));
+    if (existingUser.length > 0) {
+      return res.status(400).json({ error: 'User with this email already exists' });
+    }
+
+    // Generate unique user ID
+    const userIdNumber = Math.floor(Math.random() * 900000) + 100000;
+    const userId = `BP-ADMIN-${userIdNumber.toString().padStart(6, '0')}`;
+
+    // Hash password
+    const hashedPassword = await hashPassword(password);
+
+    // Create admin user
+    const newAdmin = await db.insert(users).values({
+      userId,
+      fullName,
+      email,
+      phone,
+      password: hashedPassword,
+      role: 'ADMIN',
+      isVerified: true, // Auto-verify admin users
+    }).returning();
+
+    res.status(201).json({
+      message: 'Admin user created successfully',
+      admin: {
+        id: newAdmin[0].id,
+        userId: newAdmin[0].userId,
+        fullName: newAdmin[0].fullName,
+        email: newAdmin[0].email,
+        role: newAdmin[0].role,
+      },
+    });
+  } catch (error) {
+    console.error('Create admin error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

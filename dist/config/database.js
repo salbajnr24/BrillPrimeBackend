@@ -47,7 +47,7 @@ const client = (0, postgres_1.default)(connectionString, {
     max: 10, // Maximum number of connections in the pool
     idle_timeout: 20,
     connect_timeout: 10,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    ssl: connectionString.includes('sslmode=require') ? { rejectUnauthorized: false } : false,
     onnotice: () => { }, // Disable notices
 });
 exports.db = (0, postgres_js_1.drizzle)(client, { schema });

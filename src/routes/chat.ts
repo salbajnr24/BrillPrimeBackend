@@ -3,6 +3,7 @@ import { eq, and, desc, or } from 'drizzle-orm';
 import db from '../config/database';
 import { conversations, chatMessages, users, products } from '../schema';
 import { authenticateToken } from '../utils/auth';
+import { websocketService } from '../utils/websocket';
 
 const router = Router();
 
@@ -83,6 +84,16 @@ router.post('/conversations', authenticateToken, async (req, res) => {
       productId,
       conversationType: conversationType as any,
     }).returning();
+
+    // Notify other participant about new conversation
+    const otherParticipantId = userRole === 'CONSUMER' ? finalVendorId : finalCustomerId;
+    if (websocketService && websocketService.isUserOnline(otherParticipantId)) {
+      websocketService.sendNotificationToUser(otherParticipantId, {
+        type: 'NEW_CONVERSATION',
+        conversationId: conversation[0].id,
+        message: 'New conversation started',
+      });
+    }
 
     res.status(201).json({
       message: 'Conversation started successfully',
@@ -352,6 +363,58 @@ router.get('/conversations/:id', authenticateToken, async (req, res) => {
     res.json(conversation[0]);
   } catch (error) {
     console.error('Get conversation details error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get online users in conversation
+router.get('/conversations/:id/online-users', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = (req as any).user.userId;
+
+    // Check if user is participant in conversation
+    const conversation = await db.select().from(conversations).where(and(
+      eq(conversations.id, id),
+      or(
+        eq(conversations.customerId, userId),
+        eq(conversations.vendorId, userId)
+      )
+    ));
+
+    if (conversation.length === 0) {
+      return res.status(404).json({ error: 'Conversation not found or you are not a participant' });
+    }
+
+    const onlineUsers = websocketService ? websocketService.getOnlineUsers() : [];
+    const conversationParticipants = [conversation[0].customerId, conversation[0].vendorId];
+    const onlineParticipants = conversationParticipants.filter(participantId => 
+      onlineUsers.includes(participantId)
+    );
+
+    res.json({
+      onlineParticipants,
+      totalOnlineUsers: onlineUsers.length,
+    });
+  } catch (error) {
+    console.error('Get online users error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get user's online status
+router.get('/users/:userId/status', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const isOnline = websocketService ? websocketService.isUserOnline(parseInt(userId)) : false;
+    
+    res.json({
+      userId: parseInt(userId),
+      isOnline,
+      lastSeen: isOnline ? null : new Date(), // In production, you'd store actual last seen
+    });
+  } catch (error) {
+    console.error('Get user status error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

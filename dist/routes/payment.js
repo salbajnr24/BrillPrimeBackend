@@ -19,7 +19,7 @@ const FLUTTERWAVE_SECRET_KEY = process.env.FLW_SECRET_KEY;
 router.post('/initialize', auth_1.authenticateToken, async (req, res) => {
     try {
         const { amount, currency = 'NGN', customerEmail } = req.body;
-        const userId = req.user.userId;
+        const userId = req.user?.userId;
         if (!amount || !customerEmail) {
             return res.status(400).json({ error: 'Amount and customer email are required' });
         }
@@ -184,9 +184,12 @@ router.post('/webhook', async (req, res) => {
 router.post('/verify', auth_1.authenticateToken, async (req, res) => {
     try {
         const { transactionId, txRef } = req.body;
-        const userId = req.user.userId;
+        const userId = req.user?.userId;
         if (!transactionId || !txRef) {
             return res.status(400).json({ error: 'Transaction ID and txRef are required' });
+        }
+        if (!userId) {
+            return res.status(401).json({ error: 'User authentication required' });
         }
         const paymentStatus = await verifyPayment(transactionId);
         // Find and update related orders
@@ -264,10 +267,12 @@ router.post('/verify', auth_1.authenticateToken, async (req, res) => {
 router.post('/process', auth_1.authenticateToken, (0, fraud_middleware_1.fraudDetectionMiddleware)('PAYMENT'), async (req, res) => {
     try {
         const { orderId, amount, paymentMethod } = req.body;
-        const userId = req.user.userId;
+        const userId = req.user?.userId;
         if (!orderId || !amount || !paymentMethod) {
             return res.status(400).json({ error: 'Order ID, amount, and payment method are required' });
         }
+        // Generate transaction reference for this payment
+        const txRef = `process-${userId}-${Date.now()}`;
         // Fetch order details
         const order = await database_1.default.select().from(schema_1.orders).where((0, drizzle_orm_1.eq)(schema_1.orders.id, orderId));
         if (order.length === 0) {
@@ -299,7 +304,7 @@ router.post('/process', auth_1.authenticateToken, (0, fraud_middleware_1.fraudDe
         }
         // If payment is successful and amount matches, update order status
         await database_1.default.update(schema_1.orders)
-            .set({ status: 'paid', updatedAt: new Date() })
+            .set({ status: 'confirmed', updatedAt: new Date() })
             .where((0, drizzle_orm_1.eq)(schema_1.orders.id, orderId));
         // Notify buyer and seller
         await (0, notifications_1.createNotification)({
@@ -324,7 +329,7 @@ router.post('/process', auth_1.authenticateToken, (0, fraud_middleware_1.fraudDe
             data: {
                 orderId,
                 transactionRef: `txn_${Date.now()}_${orderId}`, // Simulate transaction reference
-                paymentStatus: 'paid',
+                paymentStatus: 'confirmed',
             },
         });
     }
@@ -453,7 +458,7 @@ router.post('/refund/:id', auth_1.authenticateToken, async (req, res) => {
     try {
         const { id } = req.params; // This could be order ID or transaction ID
         const { amount, reason, refundType = 'full' } = req.body;
-        const userId = req.user.userId;
+        const userId = req.user?.userId;
         if (!reason) {
             return res.status(400).json({ error: 'Refund reason is required' });
         }
@@ -463,7 +468,7 @@ router.post('/refund/:id', auth_1.authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Order not found' });
         }
         const order = orderData[0];
-        const userRole = req.user.role;
+        const userRole = req.user?.role;
         // Check permissions (merchant can refund their orders, admin can refund any)
         if (order.sellerId !== userId && userRole !== 'ADMIN') {
             return res.status(403).json({ error: 'You do not have permission to process this refund' });
@@ -606,8 +611,8 @@ router.post('/dispute/:id', auth_1.authenticateToken, async (req, res) => {
 // Request payout (merchant/driver)
 router.post('/payout', auth_1.authenticateToken, (0, auth_1.authorizeRoles)('MERCHANT', 'DRIVER'), (0, fraud_middleware_1.fraudDetectionMiddleware)('WITHDRAWAL'), async (req, res) => {
     try {
-        const userId = req.user.userId;
-        const userRole = req.user.role;
+        const userId = req.user?.userId;
+        const userRole = req.user?.role;
         const { amount, bankAccount, accountNumber, bankCode, notes } = req.body;
         if (!amount || !bankAccount || !accountNumber || !bankCode) {
             return res.status(400).json({
@@ -631,10 +636,10 @@ router.post('/payout', auth_1.authenticateToken, (0, auth_1.authorizeRoles)('MER
         else if (userRole === 'DRIVER') {
             // Calculate driver available balance from completed deliveries
             const driverEarnings = await database_1.default.select({
-                totalEarnings: (0, drizzle_orm_1.sql) `sum(${deliveryRequests.deliveryFee})`,
+                totalEarnings: (0, drizzle_orm_1.sql) `sum(${schema_1.deliveryRequests.deliveryFee})`,
             })
-                .from(deliveryRequests)
-                .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(deliveryRequests.driverId, userId), (0, drizzle_orm_1.eq)(deliveryRequests.status, 'DELIVERED')));
+                .from(schema_1.deliveryRequests)
+                .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.deliveryRequests.driverId, userId), (0, drizzle_orm_1.eq)(schema_1.deliveryRequests.status, 'DELIVERED')));
             availableBalance = parseFloat(driverEarnings[0]?.totalEarnings || '0');
         }
         if (amount > availableBalance) {
@@ -663,7 +668,7 @@ router.post('/payout', auth_1.authenticateToken, (0, auth_1.authorizeRoles)('MER
             title: 'Payout Request Submitted',
             message: `Your payout request of ${amount} has been submitted and is pending approval.`,
             type: 'PAYOUT_REQUEST',
-            relatedId: payoutRequest[0].id
+            relatedId: payoutRequest.payoutId
         });
         res.json({
             status: 'Success',
@@ -679,8 +684,8 @@ router.post('/payout', auth_1.authenticateToken, (0, auth_1.authorizeRoles)('MER
 // Get payout history
 router.get('/payout/history', auth_1.authenticateToken, async (req, res) => {
     try {
-        const userId = req.user.userId;
-        const userRole = req.user.role;
+        const userId = req.user?.userId;
+        const userRole = req.user?.role;
         const { page = 1, limit = 10, status } = req.query;
         if (!['MERCHANT', 'DRIVER'].includes(userRole)) {
             return res.status(403).json({ error: 'Only merchants and drivers can view payout history' });

@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction, RequestHandler } from 'express';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_default_secret_change_in_production';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
@@ -8,7 +8,7 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 export interface JWTPayload {
   userId: number;
   email: string;
-  role: 'CONSUMER' | 'MERCHANT' | 'DRIVER';
+  role: 'CONSUMER' | 'MERCHANT' | 'DRIVER' | 'VENDOR' | 'ADMIN';
 }
 
 export const hashPassword = async (password: string): Promise<string> => {
@@ -31,7 +31,7 @@ export const generateOTP = (): string => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
+export const authenticateToken: RequestHandler = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -48,10 +48,10 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
   }
 };
 
-export const authorizeRoles = (...roles: string[]) => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const user = (req as any).user;
-    if (!user || !roles.includes(user.role)) {
+export const authorizeRoles = (...roles: string[]): RequestHandler => {
+  return (req, res, next) => {
+    const user = req.user;
+    if (!user || !roles.includes((user as any).role)) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
     next();

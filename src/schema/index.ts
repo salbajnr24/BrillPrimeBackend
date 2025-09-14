@@ -26,6 +26,7 @@ export const users = pgTable("users", {
   latitude: decimal('latitude', { precision: 10, scale: 8 }), // For geo-location
   longitude: decimal('longitude', { precision: 11, scale: 8 }), // For geo-location
   address: text('address'), // For geo-location
+  bio: text('bio'), // User biography/description
   socialAuth: jsonb('social_auth'), // { provider: 'google' | 'facebook' | 'apple', providerId: string }
   lastLoginAt: timestamp('last_login_at'), // For tracking login activity
   createdAt: timestamp('created_at').defaultNow(),

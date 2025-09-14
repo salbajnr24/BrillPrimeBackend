@@ -26,6 +26,7 @@ exports.users = (0, pg_core_1.pgTable)("users", {
     latitude: (0, pg_core_1.decimal)('latitude', { precision: 10, scale: 8 }), // For geo-location
     longitude: (0, pg_core_1.decimal)('longitude', { precision: 11, scale: 8 }), // For geo-location
     address: (0, pg_core_1.text)('address'), // For geo-location
+    bio: (0, pg_core_1.text)('bio'), // User biography/description
     socialAuth: (0, pg_core_1.jsonb)('social_auth'), // { provider: 'google' | 'facebook' | 'apple', providerId: string }
     lastLoginAt: (0, pg_core_1.timestamp)('last_login_at'), // For tracking login activity
     createdAt: (0, pg_core_1.timestamp)('created_at').defaultNow(),

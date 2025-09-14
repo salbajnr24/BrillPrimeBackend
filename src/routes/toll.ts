@@ -1,6 +1,6 @@
 
 import { Router } from 'express';
-import { eq, desc, sql, and, gte, lte } from 'drizzle-orm';
+import { eq, desc, sql, and, gte, lte, SQL } from 'drizzle-orm';
 import crypto from 'crypto';
 import QRCode from 'qrcode';
 import fs from 'fs';
@@ -65,7 +65,7 @@ const generateQRCode = async (paymentData: any): Promise<string> => {
 // Consumer/Driver: Make toll gate payment
 router.post('/pay', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
     const { 
       locationId, 
       vehicleType, 
@@ -114,13 +114,16 @@ router.post('/pay', authenticateToken, async (req, res) => {
         eq(tollLocations.isActive, true)
       ));
 
-    if (!tollData.length || !tollData[0].pricing.price) {
+    if (!tollData.length || !tollData[0].pricing || tollData[0].pricing.price == null) {
       return res.status(404).json({ 
         error: 'Toll location not found or pricing not available for this vehicle type' 
       });
     }
 
     const { location, pricing } = tollData[0];
+    if (!pricing) {
+      return res.status(404).json({ error: 'Pricing information not available' });
+    }
     const paymentReference = `TOLL_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
     const receiptNumber = generateReceiptNumber();
 
@@ -166,7 +169,9 @@ router.post('/pay', authenticateToken, async (req, res) => {
       .where(eq(tollPayments.id, payment.id));
 
     // Create notification for user
-    await createNotification(userId, 'CONSUMER', {
+    await createNotification({
+      userId,
+      userRole: 'CONSUMER',
       title: 'Toll Payment Successful',
       message: `Your toll payment of ₦${pricing.price} at ${location.name} has been processed successfully.`,
       type: 'PAYMENT',
@@ -201,18 +206,18 @@ router.post('/pay', authenticateToken, async (req, res) => {
 // Consumer/Driver: Get toll payment history
 router.get('/history', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
     const { page = 1, limit = 20, startDate, endDate } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
-    let whereClause = eq(tollPayments.userId, userId);
+    let whereClause: SQL = eq(tollPayments.userId, userId);
     
     if (startDate && endDate) {
       whereClause = and(
         whereClause,
         gte(tollPayments.createdAt, new Date(startDate as string)),
         lte(tollPayments.createdAt, new Date(endDate as string))
-      );
+      )!;
     }
 
     const payments = await db.select({
@@ -263,7 +268,7 @@ router.get('/history', authenticateToken, async (req, res) => {
 // Consumer/Driver: Get toll payment receipt
 router.get('/:id/receipt', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user?.id;
+    const userId = (req as any).user?.userId;
     const paymentId = req.params.id;
 
     const payment = await db.select({
@@ -315,7 +320,7 @@ router.get('/:id/receipt', authenticateToken, async (req, res) => {
 });
 
 // Admin/Toll Operators: View all toll payments
-router.get('/transactions', authenticateToken, authorizeRoles(['ADMIN']), async (req, res) => {
+router.get('/transactions', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
   try {
     const { 
       page = 1, 
@@ -328,23 +333,29 @@ router.get('/transactions', authenticateToken, authorizeRoles(['ADMIN']), async 
     } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
-    let whereClause = sql`1=1`;
+    let whereClause: SQL = sql`1=1`;
     
     if (locationId) {
-      whereClause = and(whereClause, eq(tollPayments.locationId, Number(locationId)));
+      whereClause = and(whereClause, eq(tollPayments.locationId, Number(locationId)))!;
     }
     if (vehicleType) {
-      whereClause = and(whereClause, eq(tollPayments.vehicleType, vehicleType as string));
+      const validVehicleTypes = ['MOTORCYCLE', 'CAR', 'TRUCK', 'BUS', 'TRAILER'];
+      if (validVehicleTypes.includes(vehicleType as string)) {
+        whereClause = and(whereClause, eq(tollPayments.vehicleType, vehicleType as any))!;
+      }
     }
     if (status) {
-      whereClause = and(whereClause, eq(tollPayments.status, status as string));
+      const validStatuses = ['PENDING', 'CANCELLED', 'SUCCESSFUL', 'FAILED'];
+      if (validStatuses.includes(status as string)) {
+        whereClause = and(whereClause, eq(tollPayments.status, status as any))!;
+      }
     }
     if (startDate && endDate) {
       whereClause = and(
         whereClause,
         gte(tollPayments.createdAt, new Date(startDate as string)),
         lte(tollPayments.createdAt, new Date(endDate as string))
-      );
+      )!;
     }
 
     const transactions = await db.select({
@@ -398,20 +409,20 @@ router.get('/transactions', authenticateToken, authorizeRoles(['ADMIN']), async 
 });
 
 // Admin/Toll Operators: Get toll usage statistics
-router.get('/stats', authenticateToken, authorizeRoles(['ADMIN']), async (req, res) => {
+router.get('/stats', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
   try {
     const { period = 'daily', locationId, startDate, endDate } = req.query;
 
-    let whereClause = sql`1=1`;
+    let whereClause: SQL = sql`1=1`;
     if (locationId) {
-      whereClause = and(whereClause, eq(tollPayments.locationId, Number(locationId)));
+      whereClause = and(whereClause, eq(tollPayments.locationId, Number(locationId)))!;
     }
     if (startDate && endDate) {
       whereClause = and(
         whereClause,
         gte(tollPayments.createdAt, new Date(startDate as string)),
         lte(tollPayments.createdAt, new Date(endDate as string))
-      );
+      )!;
     }
 
     // Get overall statistics
@@ -485,7 +496,7 @@ router.get('/stats', authenticateToken, authorizeRoles(['ADMIN']), async (req, r
 });
 
 // Admin: Add new toll location
-router.post('/locations', authenticateToken, authorizeRoles(['ADMIN']), async (req, res) => {
+router.post('/locations', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
   try {
     const { 
       name, 
@@ -542,7 +553,7 @@ router.post('/locations', authenticateToken, authorizeRoles(['ADMIN']), async (r
 });
 
 // Admin: Update toll location and pricing
-router.put('/locations/:id', authenticateToken, authorizeRoles(['ADMIN']), async (req, res) => {
+router.put('/locations/:id', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
   try {
     const locationId = req.params.id;
     const { 

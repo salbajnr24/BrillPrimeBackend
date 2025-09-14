@@ -1,6 +1,7 @@
 
 import { Router } from 'express';
 import { eq, and, desc, sql, gte, lte } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import db from '../config/database';
 import { 
   fuelInventory, 
@@ -306,7 +307,7 @@ router.put('/orders/:id/cancel', authenticateToken, async (req, res) => {
     const order = existingOrder[0];
 
     // Only allow cancellation for pending, confirmed orders
-    if (!['PENDING', 'CONFIRMED'].includes(order.status)) {
+    if (!order.status || !['PENDING', 'CONFIRMED'].includes(order.status)) {
       return res.status(400).json({ 
         error: 'Order cannot be cancelled at this stage' 
       });
@@ -691,7 +692,7 @@ router.get('/deliveries', authenticateToken, authorizeRoles('DRIVER'), async (re
     })
       .from(fuelOrders)
       .leftJoin(users, eq(fuelOrders.customerId, users.id))
-      .leftJoin(users.as('merchant'), eq(fuelOrders.merchantId, users.id))
+      .leftJoin(alias(users, 'merchant'), eq(fuelOrders.merchantId, users.id))
       .leftJoin(merchantProfiles, eq(fuelOrders.merchantId, merchantProfiles.userId))
       .where(and(...whereConditions))
       .orderBy(desc(fuelOrders.createdAt))

@@ -56,7 +56,7 @@ const generateQRCode = async (paymentData) => {
 // Consumer/Driver: Make toll gate payment
 router.post('/pay', auth_1.authenticateToken, async (req, res) => {
     try {
-        const userId = req.user?.id;
+        const userId = req.user?.userId;
         const { locationId, vehicleType, vehiclePlate, paymentMethod } = req.body;
         // Validate required fields
         if (!locationId || !vehicleType || !vehiclePlate || !paymentMethod) {
@@ -89,12 +89,15 @@ router.post('/pay', auth_1.authenticateToken, async (req, res) => {
             .from(schema_1.tollLocations)
             .leftJoin(schema_1.tollPricing, (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.tollPricing.locationId, schema_1.tollLocations.id), (0, drizzle_orm_1.eq)(schema_1.tollPricing.vehicleType, vehicleType), (0, drizzle_orm_1.eq)(schema_1.tollPricing.isActive, true)))
             .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.tollLocations.id, locationId), (0, drizzle_orm_1.eq)(schema_1.tollLocations.isActive, true)));
-        if (!tollData.length || !tollData[0].pricing.price) {
+        if (!tollData.length || !tollData[0].pricing || tollData[0].pricing.price == null) {
             return res.status(404).json({
                 error: 'Toll location not found or pricing not available for this vehicle type'
             });
         }
         const { location, pricing } = tollData[0];
+        if (!pricing) {
+            return res.status(404).json({ error: 'Pricing information not available' });
+        }
         const paymentReference = `TOLL_${Date.now()}_${crypto_1.default.randomBytes(8).toString('hex')}`;
         const receiptNumber = generateReceiptNumber();
         // Create toll payment record
@@ -136,7 +139,9 @@ router.post('/pay', auth_1.authenticateToken, async (req, res) => {
         })
             .where((0, drizzle_orm_1.eq)(schema_1.tollPayments.id, payment.id));
         // Create notification for user
-        await (0, notifications_1.createNotification)(userId, 'CONSUMER', {
+        await (0, notifications_1.createNotification)({
+            userId,
+            userRole: 'CONSUMER',
             title: 'Toll Payment Successful',
             message: `Your toll payment of ₦${pricing.price} at ${location.name} has been processed successfully.`,
             type: 'PAYMENT',
@@ -169,7 +174,7 @@ router.post('/pay', auth_1.authenticateToken, async (req, res) => {
 // Consumer/Driver: Get toll payment history
 router.get('/history', auth_1.authenticateToken, async (req, res) => {
     try {
-        const userId = req.user?.id;
+        const userId = req.user?.userId;
         const { page = 1, limit = 20, startDate, endDate } = req.query;
         const offset = (Number(page) - 1) * Number(limit);
         let whereClause = (0, drizzle_orm_1.eq)(schema_1.tollPayments.userId, userId);
@@ -221,7 +226,7 @@ router.get('/history', auth_1.authenticateToken, async (req, res) => {
 // Consumer/Driver: Get toll payment receipt
 router.get('/:id/receipt', auth_1.authenticateToken, async (req, res) => {
     try {
-        const userId = req.user?.id;
+        const userId = req.user?.userId;
         const paymentId = req.params.id;
         const payment = await database_1.default.select({
             id: schema_1.tollPayments.id,
@@ -266,7 +271,7 @@ router.get('/:id/receipt', auth_1.authenticateToken, async (req, res) => {
     }
 });
 // Admin/Toll Operators: View all toll payments
-router.get('/transactions', auth_1.authenticateToken, (0, auth_1.authorizeRoles)(['ADMIN']), async (req, res) => {
+router.get('/transactions', auth_1.authenticateToken, (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
     try {
         const { page = 1, limit = 20, locationId, vehicleType, status, startDate, endDate } = req.query;
         const offset = (Number(page) - 1) * Number(limit);
@@ -275,10 +280,16 @@ router.get('/transactions', auth_1.authenticateToken, (0, auth_1.authorizeRoles)
             whereClause = (0, drizzle_orm_1.and)(whereClause, (0, drizzle_orm_1.eq)(schema_1.tollPayments.locationId, Number(locationId)));
         }
         if (vehicleType) {
-            whereClause = (0, drizzle_orm_1.and)(whereClause, (0, drizzle_orm_1.eq)(schema_1.tollPayments.vehicleType, vehicleType));
+            const validVehicleTypes = ['MOTORCYCLE', 'CAR', 'TRUCK', 'BUS', 'TRAILER'];
+            if (validVehicleTypes.includes(vehicleType)) {
+                whereClause = (0, drizzle_orm_1.and)(whereClause, (0, drizzle_orm_1.eq)(schema_1.tollPayments.vehicleType, vehicleType));
+            }
         }
         if (status) {
-            whereClause = (0, drizzle_orm_1.and)(whereClause, (0, drizzle_orm_1.eq)(schema_1.tollPayments.status, status));
+            const validStatuses = ['PENDING', 'CANCELLED', 'SUCCESSFUL', 'FAILED'];
+            if (validStatuses.includes(status)) {
+                whereClause = (0, drizzle_orm_1.and)(whereClause, (0, drizzle_orm_1.eq)(schema_1.tollPayments.status, status));
+            }
         }
         if (startDate && endDate) {
             whereClause = (0, drizzle_orm_1.and)(whereClause, (0, drizzle_orm_1.gte)(schema_1.tollPayments.createdAt, new Date(startDate)), (0, drizzle_orm_1.lte)(schema_1.tollPayments.createdAt, new Date(endDate)));
@@ -331,7 +342,7 @@ router.get('/transactions', auth_1.authenticateToken, (0, auth_1.authorizeRoles)
     }
 });
 // Admin/Toll Operators: Get toll usage statistics
-router.get('/stats', auth_1.authenticateToken, (0, auth_1.authorizeRoles)(['ADMIN']), async (req, res) => {
+router.get('/stats', auth_1.authenticateToken, (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
     try {
         const { period = 'daily', locationId, startDate, endDate } = req.query;
         let whereClause = (0, drizzle_orm_1.sql) `1=1`;
@@ -406,7 +417,7 @@ router.get('/stats', auth_1.authenticateToken, (0, auth_1.authorizeRoles)(['ADMI
     }
 });
 // Admin: Add new toll location
-router.post('/locations', auth_1.authenticateToken, (0, auth_1.authorizeRoles)(['ADMIN']), async (req, res) => {
+router.post('/locations', auth_1.authenticateToken, (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
     try {
         const { name, location, address, latitude, longitude, operatorId, operatingHours, pricing // Array of pricing for different vehicle types
          } = req.body;
@@ -449,7 +460,7 @@ router.post('/locations', auth_1.authenticateToken, (0, auth_1.authorizeRoles)([
     }
 });
 // Admin: Update toll location and pricing
-router.put('/locations/:id', auth_1.authenticateToken, (0, auth_1.authorizeRoles)(['ADMIN']), async (req, res) => {
+router.put('/locations/:id', auth_1.authenticateToken, (0, auth_1.authorizeRoles)('ADMIN'), async (req, res) => {
     try {
         const locationId = req.params.id;
         const { name, location, address, latitude, longitude, operatorId, operatingHours, pricing, isActive } = req.body;

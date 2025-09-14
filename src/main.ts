@@ -2,10 +2,14 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import passport from 'passport';
-import 'dotenv/config';
+import { createServer } from 'http';
+import { PORT } from './config/environment';
+import { testDatabaseConnection } from './utils/db-test';
+import { initializeWebSocket } from './utils/websocket';
 
-// Import routes
+// Route imports
 import authRoutes from './routes/auth';
+import adminAuthRoutes from './routes/admin-auth';
 import userRoutes from './routes/users';
 import productRoutes from './routes/products';
 import cartRoutes from './routes/cart';
@@ -27,9 +31,12 @@ import socialAuthRoutes from './routes/social-auth';
 import reportsRoutes from './routes/reports';
 import fuelRoutes from './routes/fuel'; // Import fuel routes
 import tollRoutes from './routes/toll'; // Import toll routes
+import testEmailRoutes from './routes/test-email'; // Import test email routes
+import testValidationRoutes from './routes/test-validation'; // Import test validation routes
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const server = createServer(app);
+const serverPort = PORT || 3000;
 
 // Middleware
 app.use(helmet());
@@ -65,6 +72,7 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/admin/auth', adminAuthRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
@@ -86,6 +94,8 @@ app.use('/api/social-auth', socialAuthRoutes);
 app.use('/api/report', reportsRoutes);
 app.use('/api/fuel', fuelRoutes); // Register fuel routes
 app.use('/api/toll', tollRoutes); // Register toll routes
+app.use('/api/test-email', testEmailRoutes); // Register test email routes
+app.use('/api/test-validation', testValidationRoutes); // Register validation test routes
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
@@ -97,6 +107,12 @@ app.get('/api', (req, res) => {
         'POST /api/auth/login': 'Login user',
         'POST /api/auth/verify-otp': 'Verify email with OTP',
         'POST /api/auth/resend-otp': 'Resend OTP code',
+      },
+      adminAuth: {
+        'POST /admin/auth/register': 'Register a new admin user (requires admin key)',
+        'POST /admin/auth/login': 'Login admin user',
+        'POST /admin/auth/logout': 'Logout admin user',
+        'POST /admin/auth/reset-password': 'Reset admin password',
       },
       users: {
         'GET /api/users/profile': 'Get user profile (authenticated)',
@@ -270,6 +286,9 @@ app.get('/api', (req, res) => {
         'PUT /api/toll/locations/:id': 'Update toll pricing/location info (admin only)',
         'GET /api/toll/locations': 'Get all toll locations (public)',
       },
+      testEmail: {
+        'POST /api/test-email': 'Send a test email using Gmail SMTP',
+      },
       trustSafety: {
         'POST /api/report/user/:id': 'Report a user for abuse, scam, etc.',
         'POST /api/report/product/:id': 'Report a product for fake listing, scam, etc.',
@@ -313,12 +332,24 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-// Start server
-app.listen(Number(PORT), '0.0.0.0', () => {
-  console.log(`🚀 BrillPrime Backend server is running on port ${PORT}`);
-  console.log(`📖 API Documentation: http://localhost:${PORT}/api`);
-  console.log(`🏥 Health Check: http://localhost:${PORT}/health`);
+// Initialize WebSocket and start server
+initializeWebSocket(server);
+
+server.listen(serverPort, '0.0.0.0', () => {
+  console.log(`🚀 BrillPrime Backend server is running on port ${serverPort}`);
+  console.log(`📖 API Documentation: http://localhost:${serverPort}/api`);
+  console.log(`🏥 Health Check: http://localhost:${serverPort}/health`);
+  console.log(`💬 WebSocket server initialized for real-time chat`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+
+  // Test database connection
+  testDatabaseConnection().then(success => {
+    if (success) {
+      console.log('✅ Database connection successful');
+    } else {
+      console.log('❌ Database connection failed');
+    }
+  });
 });
 
 export default app;

@@ -46,7 +46,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
             return done(null, newUser[0]);
         }
         catch (error) {
-            return done(error, null);
+            return done(error, false);
         }
     }));
 }
@@ -81,7 +81,7 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
             return done(null, newUser[0]);
         }
         catch (error) {
-            return done(error, null);
+            return done(error, false);
         }
     }));
 }

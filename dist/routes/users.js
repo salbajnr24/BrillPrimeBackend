@@ -118,10 +118,38 @@ router.get('/merchants', async (req, res) => {
             .orderBy((0, drizzle_orm_1.desc)(schema_1.merchantProfiles.rating))
             .limit(Number(limit))
             .offset(offset);
+        let finalQuery = query;
         if (search) {
-            query = query.where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.role, 'MERCHANT'), (0, drizzle_orm_1.eq)(schema_1.users.isVerified, true), (0, drizzle_orm_1.like)(schema_1.users.fullName, `%${search}%`)));
+            finalQuery = database_1.default.select({
+                id: schema_1.users.id,
+                userId: schema_1.users.userId,
+                fullName: schema_1.users.fullName,
+                email: schema_1.users.email,
+                profilePicture: schema_1.users.profilePicture,
+                city: schema_1.users.city,
+                state: schema_1.users.state,
+                isVerified: schema_1.users.isVerified,
+                merchantProfile: {
+                    businessName: schema_1.merchantProfiles.businessName,
+                    businessType: schema_1.merchantProfiles.businessType,
+                    businessDescription: schema_1.merchantProfiles.businessDescription,
+                    businessLogo: schema_1.merchantProfiles.businessLogo,
+                    rating: schema_1.merchantProfiles.rating,
+                    reviewCount: schema_1.merchantProfiles.reviewCount,
+                    totalSales: schema_1.merchantProfiles.totalSales,
+                    totalOrders: schema_1.merchantProfiles.totalOrders,
+                    isVerified: schema_1.merchantProfiles.isVerified,
+                    subscriptionTier: schema_1.merchantProfiles.subscriptionTier,
+                },
+            })
+                .from(schema_1.users)
+                .leftJoin(schema_1.merchantProfiles, (0, drizzle_orm_1.eq)(schema_1.users.id, schema_1.merchantProfiles.userId))
+                .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.users.role, 'MERCHANT'), (0, drizzle_orm_1.eq)(schema_1.users.isVerified, true), (0, drizzle_orm_1.like)(schema_1.users.fullName, `%${search}%`)))
+                .orderBy((0, drizzle_orm_1.desc)(schema_1.merchantProfiles.rating))
+                .limit(Number(limit))
+                .offset(offset);
         }
-        const merchants = await query;
+        const merchants = await finalQuery;
         res.json({
             merchants,
             pagination: {
@@ -380,7 +408,7 @@ router.get('/search', async (req, res) => {
             (0, drizzle_orm_1.eq)(schema_1.users.isVerified, true),
         ];
         // Add search conditions
-        whereConditions.push(or((0, drizzle_orm_1.like)(schema_1.users.fullName, searchTerm), (0, drizzle_orm_1.like)(schema_1.users.email, searchTerm)));
+        whereConditions.push((0, drizzle_orm_1.or)((0, drizzle_orm_1.like)(schema_1.users.fullName, searchTerm), (0, drizzle_orm_1.like)(schema_1.users.email, searchTerm)));
         // Filter by user type if specified
         if (type && ['CONSUMER', 'MERCHANT', 'DRIVER'].includes(type)) {
             whereConditions.push((0, drizzle_orm_1.eq)(schema_1.users.role, type));
@@ -407,18 +435,18 @@ router.get('/search', async (req, res) => {
         const merchantIds = searchResults
             .filter(user => user.role === 'MERCHANT')
             .map(user => user.id);
-        let merchantProfiles = [];
+        let merchantProfilesData = [];
         if (merchantIds.length > 0) {
-            merchantProfiles = await database_1.default.select({
-                userId: merchantProfiles.userId,
-                businessName: merchantProfiles.businessName,
-                businessType: merchantProfiles.businessType,
-                rating: merchantProfiles.rating,
-                reviewCount: merchantProfiles.reviewCount,
-                isVerified: merchantProfiles.isVerified,
+            merchantProfilesData = await database_1.default.select({
+                userId: schema_1.merchantProfiles.userId,
+                businessName: schema_1.merchantProfiles.businessName,
+                businessType: schema_1.merchantProfiles.businessType,
+                rating: schema_1.merchantProfiles.rating,
+                reviewCount: schema_1.merchantProfiles.reviewCount,
+                isVerified: schema_1.merchantProfiles.isVerified,
             })
-                .from(merchantProfiles)
-                .where((0, drizzle_orm_1.and)(sql `${merchantProfiles.userId} IN (${merchantIds.join(',')})`, (0, drizzle_orm_1.like)(merchantProfiles.businessName, searchTerm)));
+                .from(schema_1.merchantProfiles)
+                .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.sql) `${schema_1.merchantProfiles.userId} IN (${merchantIds.join(',')})`, (0, drizzle_orm_1.like)(schema_1.merchantProfiles.businessName, searchTerm)));
         }
         // Combine results
         const enhancedResults = searchResults.map(user => {
@@ -435,7 +463,7 @@ router.get('/search', async (req, res) => {
             };
             // Add merchant info if applicable
             if (user.role === 'MERCHANT') {
-                const merchantProfile = merchantProfiles.find(mp => mp.userId === user.id);
+                const merchantProfile = merchantProfilesData.find(mp => mp.userId === user.id);
                 if (merchantProfile) {
                     result.merchantInfo = {
                         businessName: merchantProfile.businessName,
