@@ -327,7 +327,7 @@ app.use((err, req, res, next) => {
 });
 // Initialize WebSocket and start server
 (0, websocket_1.initializeWebSocket)(server);
-server.listen(serverPort, '0.0.0.0', () => {
+server.listen(parseInt(serverPort), '0.0.0.0', () => {
     console.log(`🚀 BrillPrime Backend server is running on port ${serverPort}`);
     console.log(`📖 API Documentation: http://localhost:${serverPort}/api`);
     console.log(`🏥 Health Check: http://localhost:${serverPort}/health`);

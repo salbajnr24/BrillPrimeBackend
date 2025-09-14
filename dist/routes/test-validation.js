@@ -32,9 +32,14 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const auth_1 = require("../utils/auth");
+const drizzle_orm_1 = require("drizzle-orm");
+const database_1 = __importDefault(require("../config/database"));
 const router = (0, express_1.Router)();
 // Test endpoint for validation checks
 router.post('/test-validation', async (req, res) => {
@@ -66,8 +71,7 @@ router.post('/test-validation', async (req, res) => {
 // Test database connection
 router.get('/test-db', async (req, res) => {
     try {
-        const db = await Promise.resolve().then(() => __importStar(require('../config/database')));
-        const result = await db.default.execute('SELECT 1 as test');
+        const result = await database_1.default.execute((0, drizzle_orm_1.sql) `SELECT 1 as test`);
         res.json({
             status: 'Success',
             message: 'Database connection working',

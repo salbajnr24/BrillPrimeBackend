@@ -6,7 +6,7 @@ const pg_core_1 = require("drizzle-orm/pg-core");
 const drizzle_zod_1 = require("drizzle-zod");
 const drizzle_orm_1 = require("drizzle-orm");
 // Define an enum for user roles if it's not defined elsewhere
-const roleEnum = (0, pg_core_1.pgEnum)("role", ["CONSUMER", "MERCHANT", "DRIVER"]);
+const roleEnum = (0, pg_core_1.pgEnum)("role", ["CONSUMER", "MERCHANT", "DRIVER", "ADMIN"]);
 exports.users = (0, pg_core_1.pgTable)("users", {
     id: (0, pg_core_1.serial)("id").primaryKey(),
     userId: (0, pg_core_1.varchar)("user_id", { length: 50 }).notNull().unique(),

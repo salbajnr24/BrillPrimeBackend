@@ -1,6 +1,8 @@
 
 import { Router } from 'express';
 import { authenticateToken } from '../utils/auth';
+import { sql } from 'drizzle-orm';
+import db from '../config/database';
 
 const router = Router();
 
@@ -36,8 +38,7 @@ router.post('/test-validation', async (req, res) => {
 // Test database connection
 router.get('/test-db', async (req, res) => {
   try {
-    const db = await import('../config/database');
-    const result = await db.default.execute('SELECT 1 as test');
+    const result = await db.execute(sql`SELECT 1 as test`);
     
     res.json({
       status: 'Success',
