@@ -7,4 +7,3 @@ var Role;
     Role["VENDOR"] = "VENDOR";
     Role["DRIVER"] = "DRIVER";
 })(Role || (exports.Role = Role = {}));
-//# sourceMappingURL=auth.js.map

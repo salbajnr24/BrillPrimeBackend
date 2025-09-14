@@ -178,6 +178,23 @@ router.post('/login', (0, fraud_middleware_1.fraudDetectionMiddleware)('LOGIN'),
             email: foundUser.email,
             role: foundUser.role,
         });
+        // Determine redirect URL based on user role
+        const getRoleRedirect = (role) => {
+            switch (role) {
+                case 'CONSUMER':
+                    return '/consumer/dashboard';
+                case 'MERCHANT':
+                    return '/merchant/dashboard';
+                case 'DRIVER':
+                    return '/driver/dashboard';
+                case 'VENDOR':
+                    return '/vendor/dashboard';
+                case 'ADMIN':
+                    return '/admin/dashboard'; // Fallback, but admins should use /admin/auth/login
+                default:
+                    return '/dashboard';
+            }
+        };
         res.json({
             message: 'Login successful',
             token,
@@ -189,6 +206,7 @@ router.post('/login', (0, fraud_middleware_1.fraudDetectionMiddleware)('LOGIN'),
                 role: foundUser.role,
                 isVerified: foundUser.isVerified,
             },
+            redirectTo: getRoleRedirect(foundUser.role),
         });
     }
     catch (error) {
@@ -629,4 +647,3 @@ router.post('/api/report/product/:id', auth_1.authenticateToken, async (req, res
     }
 });
 exports.default = router;
-//# sourceMappingURL=auth.js.map

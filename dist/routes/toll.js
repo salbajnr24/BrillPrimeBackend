@@ -560,4 +560,3 @@ router.get('/locations', async (req, res) => {
     }
 });
 exports.default = router;
-//# sourceMappingURL=toll.js.map

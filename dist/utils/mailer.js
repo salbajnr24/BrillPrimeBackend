@@ -68,4 +68,3 @@ const sendWelcomeEmail = async (email, fullName) => {
     }
 };
 exports.sendWelcomeEmail = sendWelcomeEmail;
-//# sourceMappingURL=mailer.js.map

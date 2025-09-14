@@ -32,4 +32,3 @@ var Message;
     Message["profileUpdate"] = "Profile updated successfully";
     Message["categoriesFetched"] = "Categories fetched successfully";
 })(Message || (exports.Message = Message = {}));
-//# sourceMappingURL=messages.js.map

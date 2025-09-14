@@ -350,4 +350,3 @@ router.delete('/posts/:id', auth_1.authenticateToken, (0, auth_1.authorizeRoles)
     }
 });
 exports.default = router;
-//# sourceMappingURL=social.js.map

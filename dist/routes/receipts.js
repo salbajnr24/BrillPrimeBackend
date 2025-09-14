@@ -419,4 +419,3 @@ async function generateReceiptPDF(filePath, data) {
     });
 }
 exports.default = router;
-//# sourceMappingURL=receipts.js.map

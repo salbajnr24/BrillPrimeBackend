@@ -300,4 +300,3 @@ router.get('/seller/:sellerId', async (req, res) => {
     }
 });
 exports.default = router;
-//# sourceMappingURL=products.js.map

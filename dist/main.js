@@ -7,9 +7,13 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
 const passport_1 = __importDefault(require("passport"));
-require("dotenv/config");
-// Import routes
+const http_1 = require("http");
+const environment_1 = require("./config/environment");
+const db_test_1 = require("./utils/db-test");
+const websocket_1 = require("./utils/websocket");
+// Route imports
 const auth_1 = __importDefault(require("./routes/auth"));
+const admin_auth_1 = __importDefault(require("./routes/admin-auth"));
 const users_1 = __importDefault(require("./routes/users"));
 const products_1 = __importDefault(require("./routes/products"));
 const cart_1 = __importDefault(require("./routes/cart"));
@@ -31,8 +35,11 @@ const social_auth_1 = __importDefault(require("./routes/social-auth"));
 const reports_1 = __importDefault(require("./routes/reports"));
 const fuel_1 = __importDefault(require("./routes/fuel")); // Import fuel routes
 const toll_1 = __importDefault(require("./routes/toll")); // Import toll routes
+const test_email_1 = __importDefault(require("./routes/test-email")); // Import test email routes
+const test_validation_1 = __importDefault(require("./routes/test-validation")); // Import test validation routes
 const app = (0, express_1.default)();
-const PORT = process.env.PORT || 3000;
+const server = (0, http_1.createServer)(app);
+const serverPort = environment_1.PORT || 3000;
 // Middleware
 app.use((0, helmet_1.default)());
 app.use((0, cors_1.default)({
@@ -63,6 +70,7 @@ app.get('/health', (req, res) => {
 });
 // API Routes
 app.use('/api/auth', auth_1.default);
+app.use('/admin/auth', admin_auth_1.default);
 app.use('/api/users', users_1.default);
 app.use('/api/products', products_1.default);
 app.use('/api/cart', cart_1.default);
@@ -84,6 +92,8 @@ app.use('/api/social-auth', social_auth_1.default);
 app.use('/api/report', reports_1.default);
 app.use('/api/fuel', fuel_1.default); // Register fuel routes
 app.use('/api/toll', toll_1.default); // Register toll routes
+app.use('/api/test-email', test_email_1.default); // Register test email routes
+app.use('/api/test-validation', test_validation_1.default); // Register validation test routes
 // API documentation endpoint
 app.get('/api', (req, res) => {
     res.json({
@@ -94,6 +104,12 @@ app.get('/api', (req, res) => {
                 'POST /api/auth/login': 'Login user',
                 'POST /api/auth/verify-otp': 'Verify email with OTP',
                 'POST /api/auth/resend-otp': 'Resend OTP code',
+            },
+            adminAuth: {
+                'POST /admin/auth/register': 'Register a new admin user (requires admin key)',
+                'POST /admin/auth/login': 'Login admin user',
+                'POST /admin/auth/logout': 'Logout admin user',
+                'POST /admin/auth/reset-password': 'Reset admin password',
             },
             users: {
                 'GET /api/users/profile': 'Get user profile (authenticated)',
@@ -267,6 +283,9 @@ app.get('/api', (req, res) => {
                 'PUT /api/toll/locations/:id': 'Update toll pricing/location info (admin only)',
                 'GET /api/toll/locations': 'Get all toll locations (public)',
             },
+            testEmail: {
+                'POST /api/test-email': 'Send a test email using Gmail SMTP',
+            },
             trustSafety: {
                 'POST /api/report/user/:id': 'Report a user for abuse, scam, etc.',
                 'POST /api/report/product/:id': 'Report a product for fake listing, scam, etc.',
@@ -306,12 +325,22 @@ app.use((err, req, res, next) => {
         ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
     });
 });
-// Start server
-app.listen(Number(PORT), '0.0.0.0', () => {
-    console.log(`🚀 BrillPrime Backend server is running on port ${PORT}`);
-    console.log(`📖 API Documentation: http://localhost:${PORT}/api`);
-    console.log(`🏥 Health Check: http://localhost:${PORT}/health`);
+// Initialize WebSocket and start server
+(0, websocket_1.initializeWebSocket)(server);
+server.listen(serverPort, '0.0.0.0', () => {
+    console.log(`🚀 BrillPrime Backend server is running on port ${serverPort}`);
+    console.log(`📖 API Documentation: http://localhost:${serverPort}/api`);
+    console.log(`🏥 Health Check: http://localhost:${serverPort}/health`);
+    console.log(`💬 WebSocket server initialized for real-time chat`);
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    // Test database connection
+    (0, db_test_1.testDatabaseConnection)().then(success => {
+        if (success) {
+            console.log('✅ Database connection successful');
+        }
+        else {
+            console.log('❌ Database connection failed');
+        }
+    });
 });
 exports.default = app;
-//# sourceMappingURL=main.js.map

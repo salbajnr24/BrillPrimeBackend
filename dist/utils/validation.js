@@ -322,4 +322,3 @@ const validateAddBankDetails = (data) => {
     return { isValid: errors.length === 0, errors };
 };
 exports.validateAddBankDetails = validateAddBankDetails;
-//# sourceMappingURL=validation.js.map

@@ -754,4 +754,3 @@ router.post('/:id/review', auth_1.authenticateToken, async (req, res) => {
     }
 });
 exports.default = router;
-//# sourceMappingURL=delivery.js.map

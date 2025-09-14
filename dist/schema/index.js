@@ -755,4 +755,3 @@ exports.insertFuelOrderSchema = (0, drizzle_zod_1.createInsertSchema)(exports.fu
 exports.insertTollLocationSchema = (0, drizzle_zod_1.createInsertSchema)(exports.tollLocations);
 exports.insertTollPricingSchema = (0, drizzle_zod_1.createInsertSchema)(exports.tollPricing);
 exports.insertTollPaymentSchema = (0, drizzle_zod_1.createInsertSchema)(exports.tollPayments);
-//# sourceMappingURL=index.js.map

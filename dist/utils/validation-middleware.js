@@ -72,4 +72,3 @@ exports.commonSchemas = {
         maxPrice: zod_1.z.string().optional().transform(val => val ? parseFloat(val) : undefined),
     }),
 };
-//# sourceMappingURL=validation-middleware.js.map

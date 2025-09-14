@@ -229,4 +229,3 @@ router.get('/:type/:filename', (req, res) => {
     res.sendFile(filePath);
 });
 exports.default = router;
-//# sourceMappingURL=upload.js.map

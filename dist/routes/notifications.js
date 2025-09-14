@@ -501,4 +501,3 @@ router.delete('/:id', auth_1.authenticateToken, async (req, res) => {
     }
 });
 exports.default = router;
-//# sourceMappingURL=notifications.js.map

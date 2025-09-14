@@ -743,4 +743,3 @@ router.get('/inventory/browse', async (req, res) => {
     }
 });
 exports.default = router;
-//# sourceMappingURL=fuel.js.map

@@ -63,4 +63,3 @@ exports.uploadLimiter = new RateLimiter({
     maxRequests: 10, // 10 uploads per hour
     message: 'Upload limit exceeded, please try again later.',
 });
-//# sourceMappingURL=rate-limit.js.map

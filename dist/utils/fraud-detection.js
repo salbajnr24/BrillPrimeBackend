@@ -248,4 +248,3 @@ FraudDetection.VELOCITY_LIMITS = {
     ORDER_PLACE: { count: 20, windowMinutes: 60 },
     WITHDRAWAL: { count: 3, windowMinutes: 120 },
 };
-//# sourceMappingURL=fraud-detection.js.map

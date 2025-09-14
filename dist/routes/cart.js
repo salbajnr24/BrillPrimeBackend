@@ -151,4 +151,3 @@ router.delete('/', auth_1.authenticateToken, async (req, res) => {
     }
 });
 exports.default = router;
-//# sourceMappingURL=cart.js.map

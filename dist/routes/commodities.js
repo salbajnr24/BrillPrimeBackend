@@ -335,4 +335,3 @@ router.get('/vendor/:id', auth_1.authenticateToken, async (req, res) => {
     }
 });
 exports.default = router;
-//# sourceMappingURL=commodities.js.map

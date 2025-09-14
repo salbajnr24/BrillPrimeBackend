@@ -76,4 +76,3 @@ const closeConnection = async () => {
 };
 exports.closeConnection = closeConnection;
 exports.default = exports.db;
-//# sourceMappingURL=database.js.map

@@ -494,4 +494,3 @@ router.get('/search', async (req, res) => {
     }
 });
 exports.default = router;
-//# sourceMappingURL=users.js.map

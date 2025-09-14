@@ -314,4 +314,3 @@ router.get('/trending', async (req, res) => {
     }
 });
 exports.default = router;
-//# sourceMappingURL=search.js.map

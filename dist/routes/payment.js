@@ -772,4 +772,3 @@ router.post('/api/report/product/:id', auth_1.authenticateToken, async (req, res
     }
 });
 exports.default = router;
-//# sourceMappingURL=payment.js.map

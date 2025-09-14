@@ -39,4 +39,3 @@ exports.env = {
     isStaging: String(process.env.NODE_ENV).toLowerCase().includes('staging'),
     env: process.env.NODE_ENV || 'development',
 };
-//# sourceMappingURL=environment.js.map
