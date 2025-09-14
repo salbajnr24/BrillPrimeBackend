@@ -7,6 +7,7 @@ exports.testDatabaseConnection = testDatabaseConnection;
 exports.createFirstAdmin = createFirstAdmin;
 const database_1 = __importDefault(require("../config/database"));
 const schema_1 = require("../schema");
+const drizzle_orm_1 = require("drizzle-orm");
 async function testDatabaseConnection() {
     try {
         const result = await database_1.default.select().from(schema_1.users).limit(1);
@@ -23,7 +24,7 @@ async function createFirstAdmin() {
         // Check if any admin exists
         const adminExists = await database_1.default.select()
             .from(schema_1.users)
-            .where(eq(schema_1.users.role, 'ADMIN'))
+            .where((0, drizzle_orm_1.eq)(schema_1.users.role, 'ADMIN'))
             .limit(1);
         if (adminExists.length === 0) {
             console.log('Creating first admin user...');

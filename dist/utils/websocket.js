@@ -30,7 +30,7 @@ class WebSocketService {
                 if (!token) {
                     return next(new Error('Authentication error: No token provided'));
                 }
-                const decoded = jsonwebtoken_1.default.verify(token, environment_1.JWT_SECRET);
+                const decoded = jsonwebtoken_1.default.verify(token, environment_1.JWT_SECRET_KEY);
                 const user = await database_1.default.select().from(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.id, decoded.userId));
                 if (user.length === 0) {
                     return next(new Error('Authentication error: User not found'));

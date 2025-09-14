@@ -1,11 +1,11 @@
 
-import { Server as SocketIOServer } from 'socket.io';
+import { Server as SocketIOServer, Socket } from 'socket.io';
 import { Server } from 'http';
 import jwt from 'jsonwebtoken';
 import { eq, and, or } from 'drizzle-orm';
 import db from '../config/database';
 import { conversations, chatMessages, users } from '../schema';
-import { JWT_SECRET } from '../config/environment';
+import { JWT_SECRET_KEY } from '../config/environment';
 
 interface AuthenticatedSocket extends Socket {
   userId?: number;
@@ -38,7 +38,7 @@ export class WebSocketService {
           return next(new Error('Authentication error: No token provided'));
         }
 
-        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        const decoded = jwt.verify(token, JWT_SECRET_KEY) as any;
         const user = await db.select().from(users).where(eq(users.id, decoded.userId));
         
         if (user.length === 0) {

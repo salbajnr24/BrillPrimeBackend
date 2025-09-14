@@ -34,7 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.EncryptionUtils = void 0;
-const bcrypt = __importStar(require("bcrypt"));
+const bcrypt = __importStar(require("bcryptjs"));
 const crypto = __importStar(require("crypto"));
 class EncryptionUtils {
     static async hashPassword(password) {
