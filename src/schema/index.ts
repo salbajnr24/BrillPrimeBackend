@@ -5,7 +5,7 @@ import { z } from "zod";
 import { relations } from "drizzle-orm";
 
 // Define an enum for user roles if it's not defined elsewhere
-const roleEnum = pgEnum("role", ["CONSUMER", "MERCHANT", "DRIVER"]);
+const roleEnum = pgEnum("role", ["CONSUMER", "MERCHANT", "DRIVER", "ADMIN"]);
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
