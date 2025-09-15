@@ -1,6 +1,7 @@
 modules = ["nodejs-20", "postgresql-16"]
 [agent]
 expertMode = true
+integrations = ["javascript_supabase:1.0.0"]
 
 [workflows]
 runButton = "Project"
@@ -29,6 +30,10 @@ outputType = "console"
 [[ports]]
 localPort = 3000
 externalPort = 3000
+
+[[ports]]
+localPort = 5000
+externalPort = 80
 
 [nix]
 channel = "stable-25_05"

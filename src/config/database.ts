@@ -10,7 +10,9 @@ const client = postgres(connectionString, {
   max: 10, // Maximum number of connections in the pool
   idle_timeout: 20,
   connect_timeout: 10,
-  ssl: connectionString.includes('sslmode=require') ? { rejectUnauthorized: false } : false,
+  ssl: process.env.NODE_ENV === 'production' || connectionString.includes('supabase.com') || connectionString.includes('sslmode=require') 
+    ? { rejectUnauthorized: false } 
+    : false,
   onnotice: () => {}, // Disable notices
 });
 
