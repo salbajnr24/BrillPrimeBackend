@@ -30,11 +30,11 @@ import receiptsRoutes from './routes/receipts';
 import searchRoutes from './routes/search';
 import socialAuthRoutes from './routes/social-auth';
 import reportsRoutes from './routes/reports';
-import fuelRoutes from './routes/fuel'; // Import fuel routes
-import tollRoutes from './routes/toll'; // Import toll routes
-import testEmailRoutes from './routes/test-email'; // Import test email routes
-import testValidationRoutes from './routes/test-validation'; // Import test validation routes
-import realtimeApiRoutes from './routes/realtime-api'; // Import real-time API routes
+import fuelRoutes from './routes/fuel';
+import tollRoutes from './routes/toll';
+import testEmailRoutes from './routes/test-email';
+import testValidationRoutes from './routes/test-validation';
+import realtimeApiRoutes from './routes/realtime-api';
 
 const app = express();
 const server = createServer(app);
@@ -98,11 +98,11 @@ app.use('/api/receipts', receiptsRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/social-auth', socialAuthRoutes);
 app.use('/api/report', reportsRoutes);
-app.use('/api/fuel', fuelRoutes); // Register fuel routes
-app.use('/api/toll', tollRoutes); // Register toll routes
-app.use('/api/test-email', testEmailRoutes); // Register test email routes
-app.use('/api/test-validation', testValidationRoutes); // Register validation test routes
-app.use('/api/realtime', realtimeApiRoutes); // Register real-time API routes
+app.use('/api/fuel', fuelRoutes);
+app.use('/api/toll', tollRoutes);
+app.use('/api/test-email', testEmailRoutes);
+app.use('/api/test-validation', testValidationRoutes);
+app.use('/api/realtime', realtimeApiRoutes);
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
