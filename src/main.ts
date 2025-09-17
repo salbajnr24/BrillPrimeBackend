@@ -6,6 +6,7 @@ import { createServer } from 'http';
 import { PORT } from './config/environment';
 import { testDatabaseConnection } from './utils/db-test';
 import { initializeWebSocket } from './utils/websocket';
+import { realtimeHeaders, performanceTracker } from './utils/realtime-middleware';
 
 // Route imports
 import authRoutes from './routes/auth';
@@ -33,6 +34,7 @@ import fuelRoutes from './routes/fuel'; // Import fuel routes
 import tollRoutes from './routes/toll'; // Import toll routes
 import testEmailRoutes from './routes/test-email'; // Import test email routes
 import testValidationRoutes from './routes/test-validation'; // Import test validation routes
+import realtimeApiRoutes from './routes/realtime-api'; // Import real-time API routes
 
 const app = express();
 const server = createServer(app);
@@ -51,6 +53,10 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Passport middleware
 app.use(passport.initialize());
+
+// Real-time API middleware
+app.use('/api', realtimeHeaders);
+app.use('/api', performanceTracker);
 
 // Health check endpoint
 app.get('/', (req, res) => {
@@ -96,6 +102,7 @@ app.use('/api/fuel', fuelRoutes); // Register fuel routes
 app.use('/api/toll', tollRoutes); // Register toll routes
 app.use('/api/test-email', testEmailRoutes); // Register test email routes
 app.use('/api/test-validation', testValidationRoutes); // Register validation test routes
+app.use('/api/realtime', realtimeApiRoutes); // Register real-time API routes
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
@@ -288,6 +295,18 @@ app.get('/api', (req, res) => {
       },
       testEmail: {
         'POST /api/test-email': 'Send a test email using Gmail SMTP',
+      },
+      realtimeApi: {
+        'GET /api/realtime/health': 'Real-time database health check',
+        'GET /api/realtime/dashboard/stats': 'Get real-time dashboard statistics',
+        'GET /api/realtime/users/:id': 'Get user by ID with real-time data',
+        'GET /api/realtime/users/role/:role': 'Get users by role in real-time',
+        'GET /api/realtime/products/active': 'Get active products in real-time',
+        'GET /api/realtime/products/seller/:sellerId': 'Get seller products in real-time',
+        'GET /api/realtime/orders/user/:userId': 'Get user orders in real-time',
+        'GET /api/realtime/orders/status/:status': 'Get orders by status in real-time',
+        'GET /api/realtime/activity/user/:userId': 'Get user recent activity in real-time',
+        'GET /api/realtime/security/fraud-alerts': 'Get active fraud alerts in real-time',
       },
       trustSafety: {
         'POST /api/report/user/:id': 'Report a user for abuse, scam, etc.',

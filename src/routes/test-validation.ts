@@ -9,25 +9,86 @@ const router = Router();
 // Test endpoint for validation checks
 router.post('/test-validation', async (req, res) => {
   try {
+    const { validateEmail, validatePhone, validatePassword } = await import('../utils/validation');
+    
     const testCases = [
       // Test email validation
-      { type: 'email', valid: ['test@example.com'], invalid: ['invalid-email', '@domain.com', 'test@'] },
+      { 
+        type: 'email', 
+        valid: ['test@example.com', 'user@domain.co.uk', 'name.lastname@example.org'], 
+        invalid: ['invalid-email', '@domain.com', 'test@', 'test.com', ''] 
+      },
       // Test phone validation  
-      { type: 'phone', valid: ['+1234567890', '08012345678'], invalid: ['123', 'abc', ''] },
+      { 
+        type: 'phone', 
+        valid: ['+1234567890', '08012345678', '+234-801-234-5678'], 
+        invalid: ['123', 'abc', '', '12345', '+'] 
+      },
       // Test password validation
-      { type: 'password', valid: ['password123', 'myP@ssw0rd'], invalid: ['123', '', 'pass'] },
+      { 
+        type: 'password', 
+        valid: ['password123', 'myP@ssw0rd', 'securePass1'], 
+        invalid: ['123', '', 'pass', '12345'] 
+      },
     ];
 
-    const results = testCases.map(testCase => ({
-      type: testCase.type,
-      validPassed: testCase.valid.length,
-      invalidCaught: testCase.invalid.length,
-    }));
+    const results = testCases.map(testCase => {
+      let validationFunction;
+      
+      switch (testCase.type) {
+        case 'email':
+          validationFunction = validateEmail;
+          break;
+        case 'phone':
+          validationFunction = validatePhone;
+          break;
+        case 'password':
+          validationFunction = validatePassword;
+          break;
+        default:
+          return { type: testCase.type, error: 'Unknown validation type' };
+      }
+
+      const validResults = testCase.valid.map(value => ({
+        value,
+        passed: validationFunction(value),
+        expected: true
+      }));
+
+      const invalidResults = testCase.invalid.map(value => ({
+        value,
+        passed: !validationFunction(value),
+        expected: false
+      }));
+
+      const validPassed = validResults.filter(r => r.passed).length;
+      const invalidCaught = invalidResults.filter(r => r.passed).length;
+      const totalTests = testCase.valid.length + testCase.invalid.length;
+      const totalPassed = validPassed + invalidCaught;
+
+      return {
+        type: testCase.type,
+        validPassed,
+        invalidCaught,
+        totalTests,
+        totalPassed,
+        successRate: `${((totalPassed / totalTests) * 100).toFixed(1)}%`,
+        details: {
+          validTests: validResults,
+          invalidTests: invalidResults
+        }
+      };
+    });
 
     res.json({
       status: 'Success',
       message: 'Validation tests completed',
       results,
+      summary: {
+        totalTestCases: results.length,
+        overallTests: results.reduce((sum, r) => sum + r.totalTests, 0),
+        overallPassed: results.reduce((sum, r) => sum + r.totalPassed, 0)
+      }
     });
   } catch (error) {
     console.error('Validation test error:', error);
@@ -54,7 +115,7 @@ router.get('/test-db', async (req, res) => {
 // Test fraud detection
 router.post('/test-fraud-detection', authenticateToken, async (req: any, res) => {
   try {
-    const fraudModule = await import('../utils/fraud-detection');
+    const { FraudDetection } = await import('../utils/fraud-detection');
     
     const testActivity = {
       userId: req.user.userId,
@@ -64,17 +125,18 @@ router.post('/test-fraud-detection', authenticateToken, async (req: any, res) =>
       location: { country: 'NG', city: 'Lagos' },
     };
 
-    // Mock fraud detection result since we don't have the actual implementation
-    const result = {
-      riskScore: 0.2,
-      isBlocked: false,
-      reasons: [],
-    };
+    // Use actual fraud detection implementation
+    const result = await FraudDetection.checkActivity(testActivity);
     
     res.json({
       status: 'Success',
       message: 'Fraud detection test completed',
-      data: result,
+      data: {
+        riskScore: result.riskScore,
+        isBlocked: result.shouldBlock,
+        isRisky: result.isRisky,
+        alerts: result.alerts,
+      },
     });
   } catch (error) {
     console.error('Fraud detection test error:', error);
