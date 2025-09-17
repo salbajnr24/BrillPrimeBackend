@@ -35,6 +35,11 @@ import tollRoutes from './routes/toll';
 import testEmailRoutes from './routes/test-email';
 import testValidationRoutes from './routes/test-validation';
 import realtimeApiRoutes from './routes/realtime-api';
+import fraudDetectionRoutes from './routes/fraud-detection';
+import contentModerationRoutes from './routes/content-moderation';
+import systemMonitoringRoutes from './routes/system-monitoring';
+import qrPaymentsRoutes from './routes/qr-payments';
+import liveChatRoutes from './routes/live-chat';
 
 const app = express();
 const server = createServer(app);
@@ -103,6 +108,11 @@ app.use('/api/toll', tollRoutes);
 app.use('/api/test-email', testEmailRoutes);
 app.use('/api/test-validation', testValidationRoutes);
 app.use('/api/realtime', realtimeApiRoutes);
+app.use('/api/fraud', fraudDetectionRoutes);
+app.use('/api/moderation', contentModerationRoutes);
+app.use('/api/system', systemMonitoringRoutes);
+app.use('/api/qr', qrPaymentsRoutes);
+app.use('/api/chat', liveChatRoutes);
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
@@ -307,6 +317,45 @@ app.get('/api', (req, res) => {
         'GET /api/realtime/orders/status/:status': 'Get orders by status in real-time',
         'GET /api/realtime/activity/user/:userId': 'Get user recent activity in real-time',
         'GET /api/realtime/security/fraud-alerts': 'Get active fraud alerts in real-time',
+      },
+      fraudDetection: {
+        'GET /api/fraud/alerts': 'Get fraud alerts with filtering (admin only)',
+        'GET /api/fraud/stats': 'Get fraud detection statistics (admin only)',
+        'GET /api/fraud/activities': 'Get suspicious activities (admin only)',
+        'POST /api/fraud/alerts/:alertId/investigate': 'Mark alert as investigating (admin only)',
+        'POST /api/fraud/alerts/:alertId/resolve': 'Resolve fraud alert (admin only)',
+        'POST /api/fraud/users/:userId/flag': 'Flag user account for fraud (admin only)',
+        'POST /api/fraud/alerts/bulk-action': 'Bulk action on fraud alerts (admin only)',
+      },
+      contentModeration: {
+        'GET /api/moderation/reports': 'Get content moderation reports (admin only)',
+        'POST /api/moderation/reports/:id/action': 'Take action on content report (admin only)',
+        'POST /api/moderation/reports/bulk-action': 'Bulk action on reports (admin only)',
+        'GET /api/moderation/stats': 'Get moderation statistics (admin only)',
+      },
+      systemMonitoring: {
+        'GET /api/system/health': 'Get system health status (admin only)',
+        'GET /api/system/metrics/realtime': 'Get real-time system metrics (admin only)',
+        'GET /api/system/performance': 'Get performance metrics (admin only)',
+        'GET /api/system/errors': 'Get system error logs (admin only)',
+        'POST /api/system/maintenance/backup': 'Initiate database backup (admin only)',
+      },
+      qrPayments: {
+        'POST /api/qr/generate': 'Generate QR code for payment (authenticated)',
+        'POST /api/qr/pay/:qrId': 'Process QR code payment (authenticated)',
+        'GET /api/qr/:qrId': 'Get QR code details (public)',
+        'GET /api/qr/user/codes': 'Get user\'s QR codes (authenticated)',
+        'DELETE /api/qr/:qrId': 'Cancel QR code (authenticated)',
+      },
+      liveChat: {
+        'POST /api/chat/conversations': 'Start new conversation (authenticated)',
+        'GET /api/chat/conversations': 'Get user conversations (authenticated)',
+        'GET /api/chat/conversations/:id/messages': 'Get conversation messages (authenticated)',
+        'POST /api/chat/conversations/:id/messages': 'Send message (authenticated)',
+        'GET /api/chat/admin/conversations': 'Get all conversations (admin only)',
+        'POST /api/chat/admin/conversations/:id/assign': 'Assign conversation to agent (admin only)',
+        'POST /api/chat/admin/conversations/:id/close': 'Close conversation (admin only)',
+        'GET /api/chat/admin/stats': 'Get chat statistics (admin only)',
       },
       trustSafety: {
         'POST /api/report/user/:id': 'Report a user for abuse, scam, etc.',
