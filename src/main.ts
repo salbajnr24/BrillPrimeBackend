@@ -40,6 +40,8 @@ import contentModerationRoutes from './routes/content-moderation';
 import systemMonitoringRoutes from './routes/system-monitoring';
 import qrPaymentsRoutes from './routes/qr-payments';
 import liveChatRoutes from './routes/live-chat';
+import walletRoutes from './routes/wallet';
+import securityRoutes from './routes/security';
 
 const app = express();
 const server = createServer(app);
@@ -113,6 +115,8 @@ app.use('/api/moderation', contentModerationRoutes);
 app.use('/api/system', systemMonitoringRoutes);
 app.use('/api/qr', qrPaymentsRoutes);
 app.use('/api/chat', liveChatRoutes);
+app.use('/api/wallet', walletRoutes);
+app.use('/api/security', securityRoutes);
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
@@ -356,6 +360,20 @@ app.get('/api', (req, res) => {
         'POST /api/chat/admin/conversations/:id/assign': 'Assign conversation to agent (admin only)',
         'POST /api/chat/admin/conversations/:id/close': 'Close conversation (admin only)',
         'GET /api/chat/admin/stats': 'Get chat statistics (admin only)',
+      },
+      wallet: {
+        'POST /api/wallet/create': 'Create a new wallet for the user',
+        'GET /api/wallet/balance': 'Get user wallet balance',
+        'POST /api/wallet/deposit': 'Deposit funds into the wallet',
+        'POST /api/wallet/withdraw': 'Withdraw funds from the wallet',
+        'GET /api/wallet/history': 'Get transaction history for the wallet',
+      },
+      security: {
+        'POST /api/security/enable-2fa': 'Enable two-factor authentication',
+        'POST /api/security/disable-2fa': 'Disable two-factor authentication',
+        'POST /api/security/change-password': 'Change user password',
+        'POST /api/security/login-history': 'View user login history',
+        'GET /api/security/logs': 'Get security logs (admin only)',
       },
       trustSafety: {
         'POST /api/report/user/:id': 'Report a user for abuse, scam, etc.',

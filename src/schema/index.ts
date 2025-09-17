@@ -763,6 +763,287 @@ export const receipts = pgTable("receipts", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Wallets table
+export const wallets = pgTable("wallets", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull().unique(),
+  balance: decimal("balance", { precision: 15, scale: 2 }).default('0.00'),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
+// Transactions table
+export const transactions = pgTable("transactions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  orderId: uuid("order_id").references(() => orders.id),
+  recipientId: integer("recipient_id").references(() => users.id),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  netAmount: decimal("net_amount", { precision: 15, scale: 2 }),
+  currency: text("currency").default('NGN'),
+  type: text("type", { enum: ['WALLET_FUNDING', 'PAYMENT', 'WITHDRAWAL', 'TRANSFER_IN', 'TRANSFER_OUT', 'DELIVERY_EARNINGS', 'REFUND'] }).notNull(),
+  status: text("status").default('PENDING'),
+  paymentMethod: text("payment_method"),
+  paymentStatus: text("payment_status", { enum: ["PENDING", "COMPLETED", "FAILED", "REFUNDED"] }).default('PENDING'),
+  transactionRef: text("transaction_ref").unique(),
+  paymentGatewayRef: text("payment_gateway_ref"),
+  paystackTransactionId: text("paystack_transaction_id"),
+  description: text("description"),
+  metadata: jsonb("metadata"),
+  initiatedAt: timestamp("initiated_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
+// Ratings table
+export const ratings = pgTable("ratings", {
+  id: serial("id").primaryKey(),
+  customerId: integer("customer_id").references(() => users.id),
+  orderId: uuid("order_id").references(() => orders.id),
+  driverId: integer("driver_id").references(() => users.id),
+  merchantId: integer("merchant_id").references(() => users.id),
+  productId: uuid("product_id").references(() => products.id),
+  rating: integer("rating").notNull(),
+  comment: text("comment"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Delivery Feedback table
+export const deliveryFeedback = pgTable("delivery_feedback", {
+  id: serial("id").primaryKey(),
+  orderId: uuid("order_id").references(() => orders.id).notNull(),
+  customerId: integer("customer_id").references(() => users.id).notNull(),
+  driverId: integer("driver_id").references(() => users.id).notNull(),
+  feedbackType: varchar("feedback_type", { length: 50 }).notNull(), // CUSTOMER_TO_DRIVER, DRIVER_TO_CUSTOMER
+  
+  // Customer ratings
+  driverRating: integer("driver_rating"),
+  serviceRating: integer("service_rating"),
+  deliveryTimeRating: integer("delivery_time_rating"),
+  deliveryQuality: varchar("delivery_quality", { length: 20 }), // EXCELLENT, GOOD, AVERAGE, POOR
+  wouldRecommend: boolean("would_recommend"),
+  issuesReported: text("issues_reported"),
+
+  // Driver feedback
+  customerRating: integer("customer_rating"),
+  deliveryComplexity: varchar("delivery_complexity", { length: 20 }), // EASY, MODERATE, DIFFICULT
+  customerCooperation: varchar("customer_cooperation", { length: 20 }), // EXCELLENT, GOOD, AVERAGE, POOR
+  paymentIssues: boolean("payment_issues"),
+
+  // Common fields
+  comment: text("comment"),
+  additionalFeedback: text("additional_feedback"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Notifications table
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  type: text("type").notNull(),
+  isRead: boolean("is_read").default(false),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
+// Error Logs table
+export const errorLogs = pgTable("error_logs", {
+  id: serial("id").primaryKey(),
+  message: text("message").notNull(),
+  stack: text("stack"),
+  url: text("url"),
+  userAgent: text("user_agent"),
+  userId: integer("user_id").references(() => users.id),
+  severity: text("severity").default("MEDIUM"),
+  source: text("source").default("backend"),
+  timestamp: timestamp("timestamp").defaultNow(),
+  metadata: jsonb("metadata")
+});
+
+// MFA Tokens table
+export const mfaTokens = pgTable("mfa_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  token: text("token").notNull(),
+  method: text("method").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  isUsed: boolean("is_used").default(false),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
+// Verification Documents table
+export const verificationDocuments = pgTable("verification_documents", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  documentType: text("document_type").notNull(),
+  documentNumber: text("document_number"),
+  fileName: text("file_name").notNull(),
+  fileSize: integer("file_size"),
+  mimeType: text("mime_type"),
+  expiryDate: timestamp("expiry_date"),
+  status: text("status").default('PENDING'),
+  validationScore: decimal("validation_score", { precision: 3, scale: 2 }),
+  extractedData: jsonb("extracted_data"),
+  rejectionReason: text("rejection_reason"),
+  reviewedBy: integer("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
+// Security Logs table
+export const securityLogs = pgTable("security_logs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  action: text("action").notNull(),
+  details: jsonb("details"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  severity: text("severity").default('INFO'),
+  timestamp: timestamp("timestamp").defaultNow()
+});
+
+// Trusted Devices table
+export const trustedDevices = pgTable("trusted_devices", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  deviceToken: text("device_token").unique().notNull(),
+  deviceName: text("device_name"),
+  deviceType: text("device_type"),
+  browserInfo: text("browser_info"),
+  lastUsedAt: timestamp("last_used_at"),
+  expiresAt: timestamp("expires_at").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
+// Suspicious Activities table
+export const suspiciousActivities = pgTable("suspicious_activities", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  activityType: text("activity_type").notNull(),
+  description: text("description").notNull(),
+  riskIndicators: jsonb("risk_indicators"),
+  timestamp: timestamp("timestamp").defaultNow(),
+  ipAddress: text("ip_address"),
+  deviceFingerprint: text("device_fingerprint"),
+  severity: text("severity").default('MEDIUM')
+});
+
+// Admin Users table
+export const adminUsers = pgTable("admin_users", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  role: text("role").default('ADMIN'),
+  permissions: jsonb("permissions").default('[]'),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
+// Compliance Documents table
+export const complianceDocuments = pgTable("compliance_documents", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  documentType: text("document_type").notNull(),
+  documentUrl: text("document_url").notNull(),
+  status: text("status").default('PENDING'),
+  reviewedBy: integer("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
+// Content Reports table
+export const contentReports = pgTable("content_reports", {
+  id: serial("id").primaryKey(),
+  contentType: text("content_type").notNull(),
+  contentId: text("content_id").notNull(),
+  reportedBy: integer("reported_by").references(() => users.id),
+  reason: text("reason").notNull(),
+  status: text("status").default('PENDING'),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
+// Moderation Responses table
+export const moderationResponses = pgTable("moderation_responses", {
+  id: serial("id").primaryKey(),
+  reportId: integer("report_id").references(() => contentReports.id).notNull(),
+  adminId: integer("admin_id").references(() => adminUsers.id).notNull(),
+  response: text("response").notNull(),
+  action: text("action").notNull(),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
+// Payment Methods table
+export const paymentMethods = pgTable("payment_methods", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  type: text("type").notNull(),
+  details: jsonb("details").notNull(),
+  isDefault: boolean("is_default").default(false),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
+// Admin Payment Actions table
+export const adminPaymentActions = pgTable("admin_payment_actions", {
+  id: serial("id").primaryKey(),
+  adminId: integer("admin_id").references(() => adminUsers.id).notNull(),
+  action: text("action").notNull(),
+  paymentId: text("payment_id").notNull(),
+  details: jsonb("details"),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
+// Account Flags table
+export const accountFlags = pgTable("account_flags", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  flagType: text("flag_type").notNull(),
+  severity: text("severity").default('MEDIUM'),
+  reason: text("reason").notNull(),
+  flaggedBy: integer("flagged_by").references(() => adminUsers.id),
+  status: text("status").default('ACTIVE'),
+  resolvedBy: integer("resolved_by").references(() => adminUsers.id),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
+// Audit Logs table
+export const auditLogs = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  action: text("action").notNull(),
+  resource: text("resource").notNull(),
+  resourceId: text("resource_id"),
+  oldValues: text("old_values"),
+  newValues: text("new_values"),
+  ipAddress: text("ip_address").notNull(),
+  userAgent: text("user_agent").notNull(),
+  sessionId: text("session_id"),
+  success: boolean("success").notNull(),
+  errorMessage: text("error_message"),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
+// Order Tracking table
+export const orderTracking = pgTable("order_tracking", {
+  id: serial("id").primaryKey(),
+  orderId: uuid("order_id").references(() => orders.id).notNull(),
+  driverId: integer("driver_id").references(() => users.id),
+  status: text("status").notNull(),
+  location: text("location"),
+  notes: text("notes"),
+  estimatedArrival: timestamp("estimated_arrival"),
+  timestamp: timestamp("timestamp").defaultNow()
+});
+
 // Receipt relations
 export const receiptsRelations = relations(receipts, ({ one }) => ({
   order: one(orders, {
@@ -812,6 +1093,26 @@ export const insertFuelOrderSchema = createInsertSchema(fuelOrders);
 export const insertTollLocationSchema = createInsertSchema(tollLocations);
 export const insertTollPricingSchema = createInsertSchema(tollPricing);
 export const insertTollPaymentSchema = createInsertSchema(tollPayments);
+export const insertWalletSchema = createInsertSchema(wallets);
+export const insertTransactionSchema = createInsertSchema(transactions);
+export const insertRatingSchema = createInsertSchema(ratings);
+export const insertDeliveryFeedbackSchema = createInsertSchema(deliveryFeedback);
+export const insertNotificationSchema = createInsertSchema(notifications);
+export const insertErrorLogSchema = createInsertSchema(errorLogs);
+export const insertMfaTokenSchema = createInsertSchema(mfaTokens);
+export const insertVerificationDocumentSchema = createInsertSchema(verificationDocuments);
+export const insertSecurityLogSchema = createInsertSchema(securityLogs);
+export const insertTrustedDeviceSchema = createInsertSchema(trustedDevices);
+export const insertSuspiciousActivitySchema = createInsertSchema(suspiciousActivities);
+export const insertAdminUserSchema = createInsertSchema(adminUsers);
+export const insertComplianceDocumentSchema = createInsertSchema(complianceDocuments);
+export const insertContentReportSchema = createInsertSchema(contentReports);
+export const insertModerationResponseSchema = createInsertSchema(moderationResponses);
+export const insertPaymentMethodSchema = createInsertSchema(paymentMethods);
+export const insertAdminPaymentActionSchema = createInsertSchema(adminPaymentActions);
+export const insertAccountFlagSchema = createInsertSchema(accountFlags);
+export const insertAuditLogSchema = createInsertSchema(auditLogs);
+export const insertOrderTrackingSchema = createInsertSchema(orderTracking);
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -869,3 +1170,43 @@ export type UserActivity = typeof userActivities.$inferSelect;
 export type NewUserActivity = typeof userActivities.$insert;
 export type BlacklistedEntity = typeof blacklistedEntities.$inferSelect;
 export type NewBlacklistedEntity = typeof blacklistedEntities.$insert;
+export type Wallet = typeof wallets.$inferSelect;
+export type NewWallet = typeof wallets.$inferInsert;
+export type Transaction = typeof transactions.$inferSelect;
+export type NewTransaction = typeof transactions.$inferInsert;
+export type Rating = typeof ratings.$inferSelect;
+export type NewRating = typeof ratings.$inferInsert;
+export type DeliveryFeedback = typeof deliveryFeedback.$inferSelect;
+export type NewDeliveryFeedback = typeof deliveryFeedback.$inferInsert;
+export type Notification = typeof notifications.$inferSelect;
+export type NewNotification = typeof notifications.$inferInsert;
+export type ErrorLog = typeof errorLogs.$inferSelect;
+export type NewErrorLog = typeof errorLogs.$inferInsert;
+export type MfaToken = typeof mfaTokens.$inferSelect;
+export type NewMfaToken = typeof mfaTokens.$inferInsert;
+export type VerificationDocument = typeof verificationDocuments.$inferSelect;
+export type NewVerificationDocument = typeof verificationDocuments.$inferInsert;
+export type SecurityLog = typeof securityLogs.$inferSelect;
+export type NewSecurityLog = typeof securityLogs.$inferInsert;
+export type TrustedDevice = typeof trustedDevices.$inferSelect;
+export type NewTrustedDevice = typeof trustedDevices.$inferInsert;
+export type SuspiciousActivity = typeof suspiciousActivities.$inferSelect;
+export type NewSuspiciousActivity = typeof suspiciousActivities.$inferInsert;
+export type AdminUser = typeof adminUsers.$inferSelect;
+export type NewAdminUser = typeof adminUsers.$inferInsert;
+export type ComplianceDocument = typeof complianceDocuments.$inferSelect;
+export type NewComplianceDocument = typeof complianceDocuments.$inferInsert;
+export type ContentReport = typeof contentReports.$inferSelect;
+export type NewContentReport = typeof contentReports.$inferInsert;
+export type ModerationResponse = typeof moderationResponses.$inferSelect;
+export type NewModerationResponse = typeof moderationResponses.$inferInsert;
+export type PaymentMethod = typeof paymentMethods.$inferSelect;
+export type NewPaymentMethod = typeof paymentMethods.$inferInsert;
+export type AdminPaymentAction = typeof adminPaymentActions.$inferSelect;
+export type NewAdminPaymentAction = typeof adminPaymentActions.$inferInsert;
+export type AccountFlag = typeof accountFlags.$inferSelect;
+export type NewAccountFlag = typeof accountFlags.$inferInsert;
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type NewAuditLog = typeof auditLogs.$inferInsert;
+export type OrderTracking = typeof orderTracking.$inferSelect;
+export type NewOrderTracking = typeof orderTracking.$inferInsert;
