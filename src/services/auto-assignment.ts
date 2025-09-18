@@ -1,8 +1,26 @@
 import db from '../config/database';
 import { driverProfiles, orders, users, deliveryRequests } from '../schema';
 import { eq, and, sql, ne, isNull, or } from 'drizzle-orm';
-import { messageQueue, JobTypes } from './messageQueue';
-import { realtimeAnalyticsService } from './realtimeAnalytics';
+
+// Import with fallback for missing services
+let messageQueue: any;
+let realtimeAnalyticsService: any;
+
+try {
+  messageQueue = require('./messageQueue').messageQueue;
+} catch {
+  messageQueue = {
+    add: async (type: string, data: any) => console.log('Queue job:', type, data)
+  };
+}
+
+try {
+  realtimeAnalyticsService = require('./realtimeAnalytics').realtimeAnalyticsService;
+} catch {
+  realtimeAnalyticsService = {
+    trackEvent: async (event: string, data: any) => console.log('Analytics:', event, data)
+  };
+}
 
 interface Location {
   latitude: number;

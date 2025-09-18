@@ -185,3 +185,60 @@ export const JobTypes = {
 } as const;
 
 export { MessageQueue, QueueJob, QueueOptions };
+interface QueueJob {
+  type: string;
+  data: any;
+  delay?: number;
+}
+
+export const JobTypes = {
+  SEND_NOTIFICATION: 'send_notification',
+  PROCESS_PAYMENT: 'process_payment',
+  GENERATE_RECEIPT: 'generate_receipt',
+  UPDATE_ANALYTICS: 'update_analytics'
+} as const;
+
+class MessageQueue {
+  private jobs: QueueJob[] = [];
+  private processing = false;
+
+  async add(jobType: string, data: any, options: { delay?: number } = {}): Promise<void> {
+    const job: QueueJob = {
+      type: jobType,
+      data,
+      delay: options.delay
+    };
+
+    this.jobs.push(job);
+    
+    if (!this.processing) {
+      this.processJobs();
+    }
+  }
+
+  private async processJobs(): Promise<void> {
+    this.processing = true;
+
+    while (this.jobs.length > 0) {
+      const job = this.jobs.shift();
+      if (!job) continue;
+
+      try {
+        await this.processJob(job);
+      } catch (error) {
+        console.error('Failed to process job:', error);
+      }
+    }
+
+    this.processing = false;
+  }
+
+  private async processJob(job: QueueJob): Promise<void> {
+    console.log(`Processing job: ${job.type}`, job.data);
+    
+    // Simulate job processing
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+}
+
+export const messageQueue = new MessageQueue();

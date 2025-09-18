@@ -392,3 +392,35 @@ export const validatePriceRange = (minPrice?: number, maxPrice?: number): boolea
   }
   return true;
 };
+
+export const validateId = (id: any): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+
+  if (!id) {
+    errors.push('ID is required');
+  } else if (typeof id !== 'string' && typeof id !== 'number') {
+    errors.push('ID must be a string or number');
+  }
+
+  return { isValid: errors.length === 0, errors };
+};
+
+export const validatePagination = (page: any, limit: any): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+
+  if (page !== undefined) {
+    const pageNum = Number(page);
+    if (isNaN(pageNum) || pageNum < 1) {
+      errors.push('Page must be a positive number');
+    }
+  }
+
+  if (limit !== undefined) {
+    const limitNum = Number(limit);
+    if (isNaN(limitNum) || limitNum < 1 || limitNum > 100) {
+      errors.push('Limit must be between 1 and 100');
+    }
+  }
+
+  return { isValid: errors.length === 0, errors };
+};

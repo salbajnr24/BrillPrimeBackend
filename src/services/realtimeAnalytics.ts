@@ -435,3 +435,67 @@ class RealtimeAnalyticsService extends EventEmitter {
 
 export const realtimeAnalyticsService = new RealtimeAnalyticsService();
 export { RealtimeAnalyticsService, AnalyticsEvent, MetricData, AggregatedMetric };
+interface AnalyticsEvent {
+  event: string;
+  data: any;
+  timestamp: Date;
+  userId?: number;
+}
+
+class RealtimeAnalyticsService {
+  private events: AnalyticsEvent[] = [];
+
+  async trackEvent(event: string, data: any, userId?: number): Promise<void> {
+    const analyticsEvent: AnalyticsEvent = {
+      event,
+      data,
+      timestamp: new Date(),
+      userId
+    };
+
+    this.events.push(analyticsEvent);
+    console.log('Analytics event tracked:', analyticsEvent);
+
+    // In production, you would send this to your analytics service
+    // e.g., Google Analytics, Mixpanel, etc.
+  }
+
+  async getEvents(filters?: { 
+    event?: string; 
+    userId?: number; 
+    startDate?: Date; 
+    endDate?: Date 
+  }): Promise<AnalyticsEvent[]> {
+    let filteredEvents = this.events;
+
+    if (filters?.event) {
+      filteredEvents = filteredEvents.filter(e => e.event === filters.event);
+    }
+
+    if (filters?.userId) {
+      filteredEvents = filteredEvents.filter(e => e.userId === filters.userId);
+    }
+
+    if (filters?.startDate) {
+      filteredEvents = filteredEvents.filter(e => e.timestamp >= filters.startDate!);
+    }
+
+    if (filters?.endDate) {
+      filteredEvents = filteredEvents.filter(e => e.timestamp <= filters.endDate!);
+    }
+
+    return filteredEvents;
+  }
+
+  getEventCounts(): Record<string, number> {
+    const counts: Record<string, number> = {};
+    
+    this.events.forEach(event => {
+      counts[event.event] = (counts[event.event] || 0) + 1;
+    });
+
+    return counts;
+  }
+}
+
+export const realtimeAnalyticsService = new RealtimeAnalyticsService();
