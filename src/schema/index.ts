@@ -158,7 +158,7 @@ export const products = pgTable('products', {
   quantity: integer('quantity').notNull().default(0),
   unit: varchar('unit', { length: 50 }),
   categoryId: integer('category_id').references(() => categories.id),
-  vendorId: uuid('vendor_id').notNull().references(() => users.userId),
+  vendorId: integer('vendor_id').notNull().references(() => users.id),
   sellerId: integer('seller_id').notNull().references(() => users.id),
   image: text('image'),
   images: json('images'),

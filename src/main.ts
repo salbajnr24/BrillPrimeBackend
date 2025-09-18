@@ -12,6 +12,7 @@ import { SecurityMiddleware } from './middleware/security';
 import { cacheMiddleware } from './middleware/cacheMiddleware';
 import { rateLimiter } from './middleware/rateLimiter';
 import { ValidationMiddleware } from './middleware/validation';
+import { auditLogger } from './middleware/auditLogger';
 import { realtimeAnalyticsService } from './services/realtimeAnalytics';
 import { messageQueue } from './services/messageQueue';
 
@@ -87,6 +88,7 @@ app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(ValidationMiddleware.sanitizeHtml);
+app.use(auditLogger.middleware());
 
 // Passport middleware
 app.use(passport.initialize());

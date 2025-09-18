@@ -7,22 +7,6 @@ import * as speakeasy from 'speakeasy';
 import * as QRCode from 'qrcode';
 import { sendOTPEmail, sendWelcomeEmail } from '../utils/mailer';
 import { v4 as uuidv4 } from 'uuid';
-import { 
-  SignUpDto, 
-  SignInDto, 
-  ChangePasswordDto, 
-  ForgotPasswordDto, 
-  ResetPasswordDto, 
-  VerifyOtpDto 
-} from '../types/auth';
-import { 
-  validateSignUp, 
-  validateSignIn, 
-  validateChangePassword, 
-  validateForgotPassword, 
-  validateResetPassword, 
-  validateVerifyOtp 
-} from '../utils/validation';
 import { fraudDetectionMiddleware } from '../utils/fraud-middleware';
 
 const router = Router();

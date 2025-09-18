@@ -1,4 +1,3 @@
-
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { authenticateToken } from '../utils/auth';
@@ -106,11 +105,11 @@ router.get('/product/:productId',
       const offset = (page - 1) * limit;
 
       let whereConditions = [eq(reviews.productId, parseInt(productId))];
-      
+
       if (rating) {
         whereConditions.push(eq(reviews.rating, parseInt(rating)));
       }
-      
+
       if (reviewType) {
         whereConditions.push(eq(reviews.reviewType, reviewType));
       }
@@ -183,7 +182,7 @@ router.get('/user/:userId',
       const offset = (page - 1) * limit;
 
       let whereConditions = [eq(reviews.userId, parseInt(userId))];
-      
+
       if (reviewType) {
         whereConditions.push(eq(reviews.reviewType, reviewType));
       }
