@@ -46,6 +46,8 @@ import businessCategoriesRoutes from './routes/business-categories';
 import openingHoursRoutes from './routes/opening-hours';
 import reviewsRoutes from './routes/reviews';
 import geoRoutes from './routes/geo';
+import driverManagementRoutes from './routes/driver-management';
+import autoAssignmentRoutes from './routes/auto-assignment';
 
 const app = express();
 const server = createServer(app);
@@ -125,6 +127,8 @@ app.use('/api/business-categories', businessCategoriesRoutes);
 app.use('/api/opening-hours', openingHoursRoutes);
 app.use('/api/reviews', reviewsRoutes);
 app.use('/api/geo', geoRoutes);
+app.use('/api/drivers', driverManagementRoutes);
+app.use('/api/auto-assignment', autoAssignmentRoutes);
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
@@ -407,6 +411,25 @@ app.get('/api', (req, res) => {
         'GET /api/report/admin/fraud-alerts': 'Admin: View fraud detection alerts',
         'POST /api/report/admin/blacklist': 'Admin: Add entity to blacklist',
         'DELETE /api/report/admin/blacklist/:id': 'Admin: Remove from blacklist',
+      },
+      driverManagement: {
+        'GET /api/drivers': 'Get list of all drivers (admin only)',
+        'GET /api/drivers/:id': 'Get specific driver details (admin/driver only)',
+        'PUT /api/drivers/:id': 'Update driver profile (admin/driver only)',
+        'POST /api/drivers': 'Create a new driver (admin only)',
+        'DELETE /api/drivers/:id': 'Delete a driver (admin only)',
+        'GET /api/drivers/pending-verification': 'Get drivers pending verification (admin only)',
+        'PUT /api/drivers/:id/verify': 'Verify a driver (admin only)',
+        'PUT /api/drivers/:id/suspend': 'Suspend a driver (admin only)',
+        'PUT /api/drivers/:id/activate': 'Activate a driver (admin only)',
+      },
+      autoAssignment: {
+        'POST /api/auto-assignment/settings': 'Configure auto-assignment settings (admin only)',
+        'GET /api/auto-assignment/settings': 'Get auto-assignment settings (admin only)',
+        'GET /api/auto-assignment/drivers': 'Get available drivers for assignment',
+        'POST /api/auto-assignment/assign/:deliveryId': 'Manually assign a delivery to a driver',
+        'GET /api/auto-assignment/assignments/driver/:driverId': 'Get deliveries assigned to a driver',
+        'GET /api/auto-assignment/assignments/delivery/:deliveryId': 'Get driver assigned to a delivery',
       }
     },
     authentication: {
