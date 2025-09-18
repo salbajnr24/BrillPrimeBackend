@@ -1,4 +1,3 @@
-
 import { Router } from 'express';
 import { eq, and, desc, sql, or } from 'drizzle-orm';
 import db from '../config/database';
@@ -8,9 +7,13 @@ import {
   driverNotifications,
   orders,
   deliveryRequests,
-  users
+  users,
+  notificationPreferences,
+  notificationTemplates,
+  scheduledNotifications
 } from '../schema';
 import { authenticateToken, authorizeRoles } from '../utils/auth';
+import { Message } from '../utils/messages';
 
 const router = Router();
 
@@ -29,7 +32,7 @@ const createNotification = async (notificationData: {
   const { userId, userRole, title, message, type, relatedId, priority = 'MEDIUM', actionUrl, expiresAt } = notificationData;
 
   let notification;
-  
+
   switch (userRole) {
     case 'CONSUMER':
       notification = await db.insert(consumerNotifications).values({
@@ -442,7 +445,7 @@ router.post('/order-status', authenticateToken, authorizeRoles('MERCHANT', 'DRIV
     }
 
     const order = orderResult[0];
-    
+
     // Create consumer notification
     const statusMessages = {
       confirmed: 'Your order has been confirmed by the merchant',
@@ -629,7 +632,6 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Export the createNotification utility for use in other routes
 // Update notification preferences
 router.post('/preferences', authenticateToken, async (req, res) => {
   try {
@@ -659,6 +661,30 @@ router.post('/preferences', authenticateToken, async (req, res) => {
       updatedAt: new Date()
     };
 
+    await db.insert(notificationPreferences).values({
+      userId,
+      userRole,
+      emailNotifications: userPreferences.emailNotifications,
+      pushNotifications: userPreferences.pushNotifications,
+      smsNotifications: userPreferences.smsNotifications,
+      categories: userPreferences.categories as any,
+      frequency: userPreferences.frequency,
+      quietHours: userPreferences.quietHours as any,
+      updatedAt: userPreferences.updatedAt
+    }).onConflictDoUpdate({
+      target: [notificationPreferences.userId, notificationPreferences.userRole],
+      set: {
+        emailNotifications: userPreferences.emailNotifications,
+        pushNotifications: userPreferences.pushNotifications,
+        smsNotifications: userPreferences.smsNotifications,
+        categories: userPreferences.categories as any,
+        frequency: userPreferences.frequency,
+        quietHours: userPreferences.quietHours as any,
+        updatedAt: userPreferences.updatedAt
+      }
+    });
+
+
     res.json({
       message: 'Notification preferences updated successfully',
       preferences: userPreferences
@@ -685,7 +711,7 @@ router.post('/batch-send', authenticateToken, authorizeRoles('ADMIN', 'MERCHANT'
     }
 
     const batchResults = [];
-    
+
     for (const recipient of recipients) {
       try {
         const notification = await createNotification({
@@ -697,7 +723,7 @@ router.post('/batch-send', authenticateToken, authorizeRoles('ADMIN', 'MERCHANT'
           priority,
           actionUrl: message.actionUrl,
         });
-        
+
         batchResults.push({
           userId: recipient.userId,
           status: 'sent',
@@ -866,8 +892,19 @@ router.post('/schedule', authenticateToken, authorizeRoles('ADMIN', 'MERCHANT'),
       createdAt: new Date()
     };
 
-    // In production, you'd save this to a scheduled_notifications table
-    // and use a job queue (like Bull, Agenda, or similar) to process it
+    await db.insert(scheduledNotifications).values({
+      id: scheduledNotification.id,
+      schedulerId: scheduledNotification.schedulerId,
+      recipients: JSON.stringify(scheduledNotification.recipients),
+      message: scheduledNotification.message ? JSON.stringify(scheduledNotification.message) : null,
+      templateId: scheduledNotification.templateId,
+      templateVariables: JSON.stringify(scheduledNotification.templateVariables),
+      scheduleTime: scheduledNotification.scheduleTime,
+      type: scheduledNotification.type,
+      priority: scheduledNotification.priority,
+      status: scheduledNotification.status,
+      createdAt: scheduledNotification.createdAt
+    });
 
     res.status(201).json({
       message: 'Notification scheduled successfully',
@@ -890,7 +927,18 @@ router.get('/preferences', authenticateToken, async (req, res) => {
     const userId = (req as any).user.userId;
     const userRole = (req as any).user.role;
 
-    // In production, fetch from user_notification_preferences table
+    const preferences = await db.select()
+      .from(notificationPreferences)
+      .where(and(
+        eq(notificationPreferences.userId, userId),
+        eq(notificationPreferences.userRole, userRole)
+      ));
+
+    if (preferences.length > 0) {
+      return res.json({ preferences: preferences[0] });
+    }
+
+    // If no preferences found, return defaults
     const defaultPreferences = {
       userId,
       userRole,
@@ -910,14 +958,223 @@ router.get('/preferences', authenticateToken, async (req, res) => {
       language: 'en'
     };
 
-    res.json({
-      preferences: defaultPreferences
-    });
+    res.json({ preferences: defaultPreferences });
   } catch (error) {
     console.error('Get notification preferences error:', error);
     res.status(500).json({ error: 'Failed to get notification preferences' });
   }
 });
 
+// Search for notifications (example implementation)
+router.get('/search', authenticateToken, async (req, res) => {
+  try {
+    const userId = (req as any).user.userId;
+    const userRole = (req as any).user.role;
+    const { query } = req.query;
+
+    if (!query) {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+
+    let searchResults: any[] = [];
+
+    switch (userRole) {
+      case 'CONSUMER':
+        searchResults = await db.select()
+          .from(consumerNotifications)
+          .where(and(
+            eq(consumerNotifications.consumerId, userId),
+            or(
+              sql`${consumerNotifications.title} ILIKE ${`%${query}%`}`,
+              sql`${consumerNotifications.message} ILIKE ${`%${query}%`}`
+            )
+          ))
+          .limit(10);
+        break;
+      case 'MERCHANT':
+        searchResults = await db.select()
+          .from(merchantNotifications)
+          .where(and(
+            eq(merchantNotifications.merchantId, userId),
+            or(
+              sql`${merchantNotifications.title} ILIKE ${`%${query}%`}`,
+              sql`${merchantNotifications.message} ILIKE ${`%${query}%`}`
+            )
+          ))
+          .limit(10);
+        break;
+      case 'DRIVER':
+        searchResults = await db.select()
+          .from(driverNotifications)
+          .where(and(
+            eq(driverNotifications.driverId, userId),
+            or(
+              sql`${driverNotifications.title} ILIKE ${`%${query}%`}`,
+              sql`${driverNotifications.message} ILIKE ${`%${query}%`}`
+            )
+          ))
+          .limit(10);
+        break;
+    }
+
+    res.json({ searchResults });
+  } catch (error) {
+    console.error('Search notifications error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get all notification templates (for admin)
+router.get('/templates/all', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+  try {
+    const templates = await db.select().from(notificationTemplates);
+    res.json({ templates });
+  } catch (error) {
+    console.error('Get all notification templates error:', error);
+    res.status(500).json({ error: 'Failed to get all notification templates' });
+  }
+});
+
+// Create a new notification template (for admin)
+router.post('/templates', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+  try {
+    const { name, category, type, template } = req.body;
+
+    if (!name || !category || !type || !template || !template.title || !template.body) {
+      return res.status(400).json({ error: 'Missing required fields for template creation' });
+    }
+
+    const newTemplate = await db.insert(notificationTemplates).values({
+      name,
+      category,
+      type,
+      template: template as any,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }).returning();
+
+    res.status(201).json({ message: 'Notification template created successfully', template: newTemplate[0] });
+  } catch (error) {
+    console.error('Create notification template error:', error);
+    res.status(500).json({ error: 'Failed to create notification template' });
+  }
+});
+
+// Update an existing notification template (for admin)
+router.put('/templates/:id', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, category, type, template } = req.body;
+
+    if (!name && !category && !type && !template) {
+      return res.status(400).json({ error: 'No fields provided for update' });
+    }
+
+    const updateData: any = { updatedAt: new Date() };
+    if (name) updateData.name = name;
+    if (category) updateData.category = category;
+    if (type) updateData.type = type;
+    if (template) updateData.template = template as any;
+
+    const updatedTemplate = await db.update(notificationTemplates)
+      .set(updateData)
+      .where(eq(notificationTemplates.id, id))
+      .returning();
+
+    if (updatedTemplate.length === 0) {
+      return res.status(404).json({ error: 'Notification template not found' });
+    }
+
+    res.json({ message: 'Notification template updated successfully', template: updatedTemplate[0] });
+  } catch (error) {
+    console.error('Update notification template error:', error);
+    res.status(500).json({ error: 'Failed to update notification template' });
+  }
+});
+
+// Delete a notification template (for admin)
+router.delete('/templates/:id', authenticateToken, authorizeRoles('ADMIN'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const deletedTemplate = await db.delete(notificationTemplates)
+      .where(eq(notificationTemplates.id, id))
+      .returning();
+
+    if (deletedTemplate.length === 0) {
+      return res.status(404).json({ error: 'Notification template not found' });
+    }
+
+    res.json({ message: 'Notification template deleted successfully' });
+  } catch (error) {
+    console.error('Delete notification template error:', error);
+    res.status(500).json({ error: 'Failed to delete notification template' });
+  }
+});
+
+// Get scheduled notifications
+router.get('/scheduled', authenticateToken, authorizeRoles('ADMIN', 'MERCHANT'), async (req, res) => {
+  try {
+    const { status, scheduleTime } = req.query;
+    let whereConditions: any[] = [];
+
+    if (status) {
+      whereConditions.push(eq(scheduledNotifications.status, status as string));
+    }
+    if (scheduleTime) {
+      whereConditions.push(eq(scheduledNotifications.scheduleTime, new Date(scheduleTime as string)));
+    }
+
+    const scheduledNotificationsList = await db.select()
+      .from(scheduledNotifications)
+      .where(and(...whereConditions));
+
+    // Parse JSON fields
+    const parsedNotifications = scheduledNotificationsList.map(n => ({
+      ...n,
+      recipients: JSON.parse(n.recipients),
+      message: n.message ? JSON.parse(n.message) : null,
+      templateVariables: JSON.parse(n.templateVariables),
+    }));
+
+    res.json({ scheduledNotifications: parsedNotifications });
+  } catch (error) {
+    console.error('Get scheduled notifications error:', error);
+    res.status(500).json({ error: 'Failed to get scheduled notifications' });
+  }
+});
+
+// Update scheduled notification status (e.g., retry, cancel)
+router.put('/scheduled/:id/status', authenticateToken, authorizeRoles('ADMIN', 'MERCHANT'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!status) {
+      return res.status(400).json({ error: 'Status is required' });
+    }
+
+    const updatedNotification = await db.update(scheduledNotifications)
+      .set({ status })
+      .where(eq(scheduledNotifications.id, id))
+      .returning();
+
+    if (updatedNotification.length === 0) {
+      return res.status(404).json({ error: 'Scheduled notification not found' });
+    }
+
+    res.json({ message: 'Scheduled notification status updated successfully', notification: updatedNotification[0] });
+  } catch (error) {
+    console.error('Update scheduled notification status error:', error);
+    res.status(500).json({ error: 'Failed to update scheduled notification status' });
+  }
+});
+
+// Example of using the Message enum for responses
+router.get('/example', authenticateToken, (req, res) => {
+  res.json({ message: Message.userProfile });
+});
+
+// Export the createNotification utility for use in other routes
 export { createNotification };
 export default router;
