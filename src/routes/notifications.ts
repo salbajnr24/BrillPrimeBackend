@@ -1177,4 +1177,7 @@ router.get('/example', authenticateToken, (req, res) => {
 
 // Export the createNotification utility for use in other routes
 export { createNotification };
+// Export the createNotification function for use in other modules
+export { createNotification };
+
 export default router;

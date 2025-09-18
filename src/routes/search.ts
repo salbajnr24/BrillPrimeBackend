@@ -1,9 +1,9 @@
-
 import { Router } from 'express';
-import { eq, and, like, sql, desc, asc } from 'drizzle-orm';
+import { eq, and, like, sql, desc, asc, count, or } from 'drizzle-orm';
 import db from '../config/database';
-import { products, categories, users, merchantProfiles } from '../schema';
+import { products, categories, users, merchantProfiles, searchHistory, trendingSearches } from '../schema';
 import { authenticateToken } from '../utils/auth';
+import { Message } from '../utils/messages';
 
 const router = Router();
 
@@ -99,8 +99,8 @@ router.get('/products', async (req, res) => {
         businessAddress: merchantProfiles.businessAddress,
         rating: merchantProfiles.rating,
       },
-      distance: latitude && longitude ? 
-        sql<number>`6371 * acos(cos(radians(${Number(latitude)})) * cos(radians(CAST(${users.latitude} AS DECIMAL))) * cos(radians(CAST(${users.longitude} AS DECIMAL)) - radians(${Number(longitude)})) + sin(radians(${Number(latitude)})) * sin(radians(CAST(${users.latitude} AS DECIMAL))))` : 
+      distance: latitude && longitude ?
+        sql<number>`6371 * acos(cos(radians(${Number(latitude)})) * cos(radians(CAST(${users.latitude} AS DECIMAL))) * cos(radians(CAST(${users.longitude} AS DECIMAL)) - radians(${Number(longitude)})) + sin(radians(${Number(latitude)})) * sin(radians(CAST(${users.latitude} AS DECIMAL))))` :
         sql<number>`0`
     })
       .from(products)
@@ -280,79 +280,62 @@ router.get('/merchants', async (req, res) => {
 // Get autocomplete suggestions
 router.get('/autocomplete', async (req, res) => {
   try {
-    const { q, limit = 10 } = req.query;
+    const { q: query, limit = 10 } = req.query;
 
-    if (!q || (q as string).length < 2) {
-      return res.json({ suggestions: [] });
+    if (!query || typeof query !== 'string' || query.trim().length < 2) {
+      return res.status(400).json({
+        error: 'Query parameter "q" is required and must be at least 2 characters'
+      });
     }
 
-    const query = (q as string).toLowerCase();
-    const suggestions: any[] = [];
+    const searchTerm = `%${query.trim()}%`;
 
-    // Product name suggestions
+    // Get product suggestions
     const productSuggestions = await db.select({
-      text: products.name,
-      type: sql<string>`'product'`,
-      category: categories.name
+      id: products.id,
+      name: products.name,
+      type: sql`'product'`.as('type'),
+      image: products.image,
+      price: products.price,
     })
       .from(products)
-      .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(and(
         eq(products.isActive, true),
-        sql`LOWER(${products.name}) LIKE ${`%${query}%`}`
+        like(products.name, searchTerm)
       ))
-      .limit(5);
+      .limit(Number(limit) / 2);
 
-    suggestions.push(...productSuggestions.map(p => ({ 
-      text: p.text, 
-      type: p.type,
-      category: p.category 
-    })));
-
-    // Category suggestions
+    // Get category suggestions
     const categorySuggestions = await db.select({
-      text: categories.name,
-      type: sql<string>`'category'`
+      id: categories.id,
+      name: categories.name,
+      type: sql`'category'`.as('type'),
+      image: categories.icon,
+      price: sql`null`.as('price'),
     })
       .from(categories)
-      .where(and(
-        eq(categories.isActive, true),
-        sql`LOWER(${categories.name}) LIKE ${`%${query}%`}`
-      ))
-      .limit(3);
+      .where(like(categories.name, searchTerm))
+      .limit(Number(limit) / 2);
 
-    suggestions.push(...categorySuggestions.map(c => ({ 
-      text: c.text, 
-      type: c.type 
-    })));
-
-    // Business name suggestions
-    const businessSuggestions = await db.select({
-      text: merchantProfiles.businessName,
-      type: sql<string>`'business'`
-    })
-      .from(merchantProfiles)
-      .where(and(
-        eq(merchantProfiles.isVerified, true),
-        sql`LOWER(${merchantProfiles.businessName}) LIKE ${`%${query}%`}`
-      ))
-      .limit(3);
-
-    suggestions.push(...businessSuggestions.map(b => ({ 
-      text: b.text, 
-      type: b.type 
-    })));
+    const suggestions = [...productSuggestions, ...categorySuggestions]
+      .slice(0, Number(limit));
 
     res.json({
-      suggestions: suggestions.slice(0, parseInt(limit as string))
+      status: 'Success',
+      message: Message.searchAutocomplete,
+      data: {
+        suggestions,
+        query: query.trim(),
+        total: suggestions.length,
+      },
     });
   } catch (error) {
-    console.error('Autocomplete error:', error);
-    res.status(500).json({ error: 'Failed to get autocomplete suggestions' });
+    console.error('Autocomplete search error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Get suggestions/autocomplete
+// GET /api/search/suggestions - Get suggestions/autocomplete
 router.get('/suggestions', async (req, res) => {
   try {
     const { q, type = 'all' } = req.query;
@@ -428,280 +411,26 @@ router.get('/suggestions', async (req, res) => {
   }
 });
 
-// Popular/trending searches
-router.get('/trending', async (req, res) => {
-  try {
-    // This would typically come from analytics/search logs
-    // For now, we'll return popular categories and products
-    const popularCategories = await db.select({
-      id: categories.id,
-      name: categories.name,
-      icon: categories.icon,
-      productCount: sql<number>`(SELECT COUNT(*) FROM ${products} WHERE ${products.categoryId} = ${categories.id} AND ${products.isActive} = true)`
-    })
-      .from(categories)
-      .where(eq(categories.isActive, true))
-      .orderBy(desc(sql`(SELECT COUNT(*) FROM ${products} WHERE ${products.categoryId} = ${categories.id} AND ${products.isActive} = true)`))
-      .limit(5);
-
-    const popularProducts = await db.select({
-      id: products.id,
-      name: products.name,
-      image: products.image,
-      price: products.price,
-      rating: products.rating,
-      reviewCount: products.reviewCount
-    })
-      .from(products)
-      .where(eq(products.isActive, true))
-      .orderBy(desc(sql`CAST(${products.rating} AS DECIMAL) * ${products.reviewCount}`))
-      .limit(10);
-
-    res.json({
-      trending: {
-        categories: popularCategories,
-        products: popularProducts
-      }
-    });
-  } catch (error) {
-    console.error('Trending search error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Advanced search with filters
-router.post('/advanced', async (req, res) => {
-  try {
-    const {
-      query = '',
-      filters = {},
-      sort = 'relevance',
-      page = 1,
-      limit = 20,
-      userLocation
-    } = req.body;
-
-    const {
-      category,
-      minPrice,
-      maxPrice,
-      rating,
-      availability,
-      merchantId,
-      dateRange
-    } = filters;
-
-    const offset = (Number(page) - 1) * Number(limit);
-    let whereConditions = [eq(products.isActive, true)];
-
-    // Text search
-    if (query) {
-      whereConditions.push(
-        sql`(${products.name} ILIKE ${`%${query}%`} OR ${products.description} ILIKE ${`%${query}%`})`
-      );
-    }
-
-    // Apply filters
-    if (category) {
-      whereConditions.push(eq(products.categoryId, category));
-    }
-    if (minPrice) {
-      whereConditions.push(sql`CAST(${products.price} AS DECIMAL) >= ${minPrice}`);
-    }
-    if (maxPrice) {
-      whereConditions.push(sql`CAST(${products.price} AS DECIMAL) <= ${maxPrice}`);
-    }
-    if (rating) {
-      whereConditions.push(sql`CAST(${products.rating} AS DECIMAL) >= ${rating}`);
-    }
-    if (availability) {
-      whereConditions.push(eq(products.inStock, availability === 'in_stock'));
-    }
-    if (merchantId) {
-      whereConditions.push(eq(products.sellerId, merchantId));
-    }
-
-    let selectQuery = db.select({
-      id: products.id,
-      name: products.name,
-      description: products.description,
-      price: products.price,
-      image: products.image,
-      rating: products.rating,
-      reviewCount: products.reviewCount,
-      inStock: products.inStock,
-      category: categories.name,
-      merchant: {
-        id: users.id,
-        name: users.fullName,
-        businessName: merchantProfiles.businessName
-      }
-    })
-      .from(products)
-      .leftJoin(categories, eq(products.categoryId, categories.id))
-      .leftJoin(users, eq(products.sellerId, users.id))
-      .leftJoin(merchantProfiles, eq(users.id, merchantProfiles.userId))
-      .where(and(...whereConditions));
-
-    // Apply sorting
-    switch (sort) {
-      case 'price_asc':
-        selectQuery = (selectQuery as any).orderBy(asc(sql`CAST(${products.price} AS DECIMAL)`));
-        break;
-      case 'price_desc':
-        selectQuery = (selectQuery as any).orderBy(desc(sql`CAST(${products.price} AS DECIMAL)`));
-        break;
-      case 'rating':
-        selectQuery = (selectQuery as any).orderBy(desc(sql`CAST(${products.rating} AS DECIMAL)`));
-        break;
-      case 'newest':
-        selectQuery = (selectQuery as any).orderBy(desc(products.createdAt));
-        break;
-      default:
-        selectQuery = (selectQuery as any).orderBy(desc(products.createdAt));
-    }
-
-    const results = await selectQuery.limit(Number(limit)).offset(offset);
-
-    res.json({
-      results,
-      filters: {
-        query,
-        appliedFilters: filters,
-        sort
-      },
-      pagination: {
-        page: Number(page),
-        limit: Number(limit),
-        total: results.length
-      }
-    });
-  } catch (error) {
-    console.error('Advanced search error:', error);
-    res.status(500).json({ error: 'Failed to perform advanced search' });
-  }
-});
-
-// Save search criteria
-router.post('/save-search', authenticateToken, async (req, res) => {
-  try {
-    const userId = (req as any).user.userId;
-    const { searchName, criteria, notificationEnabled = false } = req.body;
-
-    if (!searchName || !criteria) {
-      return res.status(400).json({ error: 'Search name and criteria are required' });
-    }
-
-    // Create saved search (storing in user's profile metadata for now)
-    const savedSearch = {
-      id: `search_${Date.now()}`,
-      userId,
-      name: searchName,
-      criteria,
-      notificationEnabled,
-      createdAt: new Date(),
-      lastUsed: new Date()
-    };
-
-    // In a real implementation, you'd save this to a dedicated table
-    // For now, we'll return success
-    res.status(201).json({
-      message: 'Search criteria saved successfully',
-      savedSearch
-    });
-  } catch (error) {
-    console.error('Save search error:', error);
-    res.status(500).json({ error: 'Failed to save search criteria' });
-  }
-});
-
-export default router;
-import { Router } from 'express';
-import { eq, and, like, desc, sql, count, or } from 'drizzle-orm';
-import db from '../config/database';
-import { products, categories, users, searchHistory, trendingSearches } from '../schema';
-import { authenticateToken } from '../utils/auth';
-import { Message } from '../utils/messages';
-
-const router = Router();
-
-// GET /api/search/autocomplete - Search suggestions
-router.get('/autocomplete', async (req, res) => {
-  try {
-    const { q: query, limit = 10 } = req.query;
-
-    if (!query || typeof query !== 'string' || query.trim().length < 2) {
-      return res.status(400).json({ 
-        error: 'Query parameter "q" is required and must be at least 2 characters' 
-      });
-    }
-
-    const searchTerm = `%${query.trim()}%`;
-
-    // Get product suggestions
-    const productSuggestions = await db.select({
-      id: products.id,
-      name: products.name,
-      type: sql`'product'`.as('type'),
-      image: products.image,
-      price: products.price,
-    })
-      .from(products)
-      .where(and(
-        eq(products.isActive, true),
-        like(products.name, searchTerm)
-      ))
-      .limit(Number(limit) / 2);
-
-    // Get category suggestions
-    const categorySuggestions = await db.select({
-      id: categories.id,
-      name: categories.name,
-      type: sql`'category'`.as('type'),
-      image: categories.icon,
-      price: sql`null`.as('price'),
-    })
-      .from(categories)
-      .where(like(categories.name, searchTerm))
-      .limit(Number(limit) / 2);
-
-    const suggestions = [...productSuggestions, ...categorySuggestions]
-      .slice(0, Number(limit));
-
-    res.json({
-      status: 'Success',
-      message: Message.searchAutocomplete,
-      data: {
-        suggestions,
-        query: query.trim(),
-        total: suggestions.length,
-      },
-    });
-  } catch (error) {
-    console.error('Autocomplete search error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
 
 // POST /api/search/advanced - Advanced search with filters
 router.post('/advanced', authenticateToken, async (req, res) => {
   try {
     const userId = (req as any).user.userId;
-    const { 
-      query, 
-      category, 
-      minPrice, 
-      maxPrice, 
-      location, 
-      rating, 
+    const {
+      query,
+      category,
+      minPrice,
+      maxPrice,
+      location,
+      rating,
       inStock,
       sortBy = 'relevance',
       page = 1,
-      limit = 20 
+      limit = 20
     } = req.body;
 
     const offset = (Number(page) - 1) * Number(limit);
-    
+
     let whereConditions: any[] = [eq(products.isActive, true)];
 
     // Text search
@@ -858,9 +587,13 @@ router.get('/trending', async (req, res) => {
       category: {
         name: categories.name,
       },
+      seller: {
+        name: users.fullName,
+      },
     })
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
+      .leftJoin(users, eq(products.sellerId, users.id))
       .where(eq(products.isActive, true))
       .orderBy(desc(products.reviewCount))
       .limit(Number(limit));

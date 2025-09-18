@@ -4,7 +4,6 @@ import { z } from "zod";
 import { relations } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 
-
 // Define an enum for user roles if it's not defined elsewhere
 const roleEnum = pgEnum("role", ["CONSUMER", "MERCHANT", "DRIVER", "ADMIN"]);
 
@@ -24,12 +23,12 @@ export const users = pgTable("users", {
   city: varchar("city", { length: 100 }),
   state: varchar("state", { length: 100 }),
   country: varchar("country", { length: 100 }).default('Nigeria'),
-  latitude: decimal('latitude', { precision: 10, scale: 8 }), // For geo-location
-  longitude: decimal('longitude', { precision: 11, scale: 8 }), // For geo-location
-  address: text('address'), // For geo-location
-  bio: text('bio'), // User biography/description
-  socialAuth: jsonb('social_auth'), // { provider: 'google' | 'facebook' | 'apple', providerId: string }
-  lastLoginAt: timestamp('last_login_at'), // For tracking login activity
+  latitude: decimal('latitude', { precision: 10, scale: 8 }),
+  longitude: decimal('longitude', { precision: 11, scale: 8 }),
+  address: text('address'),
+  bio: text('bio'),
+  socialAuth: jsonb('social_auth'),
+  lastLoginAt: timestamp('last_login_at'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
@@ -66,7 +65,7 @@ export const categories = pgTable('categories', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
-// Business Categories table (for vendor business categorization)
+// Business Categories table
 export const businessCategories = pgTable('business_categories', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: varchar('name', { length: 100 }).notNull().unique(),
@@ -77,7 +76,7 @@ export const businessCategories = pgTable('business_categories', {
   deletedAt: timestamp('deleted_at'),
 });
 
-// Commodity Categories table (subcategories of business categories)
+// Commodity Categories table
 export const commodityCategories = pgTable('commodity_categories', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: varchar('name', { length: 100 }).notNull(),
@@ -88,13 +87,13 @@ export const commodityCategories = pgTable('commodity_categories', {
   deletedAt: timestamp('deleted_at'),
 });
 
-// Opening Hours table (for vendor operating hours)
+// Opening Hours table
 export const openingHours = pgTable('opening_hours', {
   id: uuid('id').primaryKey().defaultRandom(),
   vendorId: uuid('vendor_id').notNull().references(() => users.id),
-  dayOfWeek: varchar('day_of_week', { length: 20 }), // Monday, Tuesday, etc.
-  openTime: varchar('open_time', { length: 10 }), // e.g., "08:00"
-  closeTime: varchar('close_time', { length: 10 }), // e.g., "20:00"
+  dayOfWeek: varchar('day_of_week', { length: 20 }),
+  openTime: varchar('open_time', { length: 10 }),
+  closeTime: varchar('close_time', { length: 10 }),
   isDeleted: boolean('is_deleted').default(false),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
@@ -150,946 +149,653 @@ export const reviewResponses = pgTable('review_responses', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
-// Geolocation functionality tables
-export const serviceAreas = pgTable('service_areas', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  name: varchar('name', { length: 100 }).notNull(),
-  description: text('description'),
-  boundaryPolygon: text('boundary_polygon'), // Store as GeoJSON or WKT
-  isActive: boolean('is_active').default(true),
-  deliveryFee: decimal('delivery_fee', { precision: 10, scale: 2 }),
-  estimatedDeliveryTime: integer('estimated_delivery_time'), // in minutes
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
-
-export const deliveryZones = pgTable('delivery_zones', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  name: varchar('name', { length: 100 }).notNull(),
-  centerLatitude: decimal('center_latitude', { precision: 10, scale: 8 }),
-  centerLongitude: decimal('center_longitude', { precision: 11, scale: 8 }),
-  radiusKm: decimal('radius_km', { precision: 5, scale: 2 }),
-  deliveryFee: decimal('delivery_fee', { precision: 10, scale: 2 }),
-  minOrderAmount: decimal('min_order_amount', { precision: 10, scale: 2 }),
-  maxDeliveryTime: integer('max_delivery_time'), // in minutes
-  isActive: boolean('is_active').default(true),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
-
-// Enhanced notifications tables
-export const notificationPreferences = pgTable('notification_preferences', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id).notNull(),
-  orderUpdates: boolean('order_updates').default(true),
-  promotions: boolean('promotions').default(true),
-  newsletter: boolean('newsletter').default(false),
-  smsEnabled: boolean('sms_enabled').default(true),
-  emailEnabled: boolean('email_enabled').default(true),
-  pushEnabled: boolean('push_enabled').default(true),
-  quietHoursStart: time('quiet_hours_start').default('22:00'),
-  quietHoursEnd: time('quiet_hours_end').default('08:00'),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
-
-export const notificationTemplates = pgTable('notification_templates', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  name: varchar('name', { length: 100 }).notNull(),
-  subject: varchar('subject', { length: 255 }),
-  content: text('content').notNull(),
-  category: varchar('category', { length: 50 }),
-  variables: json('variables'), // Template variables
-  isActive: boolean('is_active').default(true),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
-
-export const scheduledNotifications = pgTable('scheduled_notifications', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  schedulerId: uuid('scheduler_id').references(() => users.id).notNull(),
-  recipients: json('recipients').notNull(), // Array of user IDs
-  title: varchar('title', { length: 255 }).notNull(),
-  message: text('message').notNull(),
-  type: varchar('type', { length: 50 }).default('GENERAL'),
-  priority: varchar('priority', { length: 20 }).default('MEDIUM'),
-  scheduledFor: timestamp('scheduled_for').notNull(),
-  isRecurring: boolean('is_recurring').default(false),
-  recurringPattern: json('recurring_pattern'), // Cron-like pattern
-  templateId: uuid('template_id').references(() => notificationTemplates.id),
-  status: varchar('status', { length: 20 }).default('pending'), // pending, sent, failed
-  sentAt: timestamp('sent_at'),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
-
-
+// Products table
 export const products = pgTable('products', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: varchar('name', { length: 255 }).notNull(),
   description: text('description'),
   price: varchar('price', { length: 20 }).notNull(),
-  quantity: integer('quantity').notNull(),
+  quantity: integer('quantity').notNull().default(0),
   unit: varchar('unit', { length: 50 }),
   categoryId: integer('category_id').references(() => categories.id),
-  vendorId: uuid('vendor_id').notNull().references(() => users.userId), // Changed to match Prisma
-  sellerId: integer('seller_id').notNull().references(() => users.id), // Keep for backward compatibility
-  imageUrl: varchar('image_url', { length: 500 }),
-  image: varchar('image', { length: 500 }), // Keep for backward compatibility
-  category: varchar('category', { length: 100 }), // Added from Prisma
-  rating: decimal('rating', { precision: 3, scale: 2 }).default('0'),
+  vendorId: uuid('vendor_id').notNull().references(() => users.userId),
+  sellerId: integer('seller_id').notNull().references(() => users.id),
+  image: text('image'),
+  images: json('images'),
+  rating: varchar('rating', { length: 10 }).default('0'),
   reviewCount: integer('review_count').default(0),
   inStock: boolean('in_stock').default(true),
   isActive: boolean('is_active').default(true),
   minimumOrder: integer('minimum_order').default(1),
-  isDeleted: boolean('is_deleted').default(false),
+  maximumOrder: integer('maximum_order'),
+  weight: decimal('weight', { precision: 8, scale: 2 }),
+  dimensions: json('dimensions'),
+  tags: json('tags'),
+  discountPrice: varchar('discount_price', { length: 20 }),
+  discountPercentage: integer('discount_percentage'),
+  availableFrom: timestamp('available_from'),
+  availableUntil: timestamp('available_until'),
+  featured: boolean('featured').default(false),
+  seoTitle: varchar('seo_title', { length: 255 }),
+  seoDescription: text('seo_description'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-  deletedAt: timestamp('deleted_at'),
 });
 
+// Orders table
 export const orders = pgTable('orders', {
   id: uuid('id').primaryKey().defaultRandom(),
-  totalPrice: decimal('total_price', { precision: 10, scale: 2 }).notNull(),
-  consumerId: uuid('consumer_id').notNull().references(() => users.userId),
-  vendorId: uuid('vendor_id').notNull().references(() => users.userId),
-  status: varchar('status', { length: 20 }).default('PENDING'), // FAILED, PENDING, PAID, COMPLETE
-  txRef: varchar('tx_ref', { length: 255 }).unique(),
-  transactionId: varchar('transaction_id', { length: 255 }),
-  isDeleted: boolean('is_deleted').default(false),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-  deletedAt: timestamp('deleted_at'),
-});
-
-// Order Items table (stores cart items for orders)
-export const orderItems = pgTable('order_items', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
-  cartId: uuid('cart_id').notNull(),
-  commodityId: uuid('commodity_id').notNull(),
+  buyerId: integer('buyer_id').notNull().references(() => users.id),
+  sellerId: integer('seller_id').notNull().references(() => users.id),
+  productId: uuid('product_id').notNull().references(() => products.id),
   quantity: integer('quantity').notNull(),
-  commodityName: varchar('commodity_name', { length: 255 }).notNull(),
-  commodityDescription: text('commodity_description'),
-  commodityPrice: varchar('commodity_price', { length: 20 }).notNull(),
-  unit: varchar('unit', { length: 50 }),
-  imageUrl: varchar('image_url', { length: 500 }),
-  vendorId: uuid('vendor_id').notNull(),
-  isDeleted: boolean('is_deleted').default(false),
+  totalPrice: varchar('total_price', { length: 20 }).notNull(),
+  status: varchar('status', { length: 50 }).default('pending'),
+  paymentStatus: varchar('payment_status', { length: 50 }).default('pending'),
+  paymentTxRef: varchar('payment_tx_ref', { length: 255 }),
+  deliveryAddress: text('delivery_address'),
+  specialInstructions: text('special_instructions'),
+  estimatedDeliveryDate: timestamp('estimated_delivery_date'),
+  actualDeliveryDate: timestamp('actual_delivery_date'),
+  driverId: integer('driver_id').references(() => users.id),
+  trackingNumber: varchar('tracking_number', { length: 100 }),
+  orderNotes: text('order_notes'),
+  cancelReason: text('cancel_reason'),
+  refundAmount: varchar('refund_amount', { length: 20 }),
+  refundStatus: varchar('refund_status', { length: 50 }),
+  metadata: json('metadata'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-  deletedAt: timestamp('deleted_at'),
 });
 
+// Cart Items table
 export const cartItems = pgTable('cart_items', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  cartId: uuid('cart_id').notNull().references(() => carts.id),
-  commodityId: uuid('commodity_id').notNull().references(() => products.id),
-  productId: integer('product_id').notNull().references(() => products.id), // Keep for backward compatibility
-  vendorId: uuid('vendor_id'), // Added from Prisma
-  quantity: integer('quantity').notNull(),
-  isDeleted: boolean('is_deleted').default(false),
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  productId: uuid('product_id').notNull().references(() => products.id),
+  quantity: integer('quantity').notNull().default(1),
+  notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-  deletedAt: timestamp('deleted_at'),
 });
 
-export const vendorPosts = pgTable("vendor_posts", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  vendorId: integer("vendor_id").notNull().references(() => users.id),
-  title: text("title").notNull(),
-  content: text("content").notNull(),
-  postType: text("post_type", { enum: ["PRODUCT_UPDATE", "NEW_PRODUCT", "PROMOTION", "ANNOUNCEMENT", "RESTOCK"] }).notNull(),
-  productId: uuid("product_id").references(() => products.id),
-  images: text("images").array(),
-  tags: text("tags").array(),
-  originalPrice: decimal("original_price", { precision: 12, scale: 2 }),
-  discountPrice: decimal("discount_price", { precision: 12, scale: 2 }),
-  discountPercentage: integer("discount_percentage"),
-  validUntil: timestamp("valid_until"),
-  isActive: boolean("is_active").default(true),
-  viewCount: integer("view_count").default(0),
-  likeCount: integer("like_count").default(0),
-  commentCount: integer("comment_count").default(0),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-export const vendorPostLikes = pgTable("vendor_post_likes", {
-  id: serial("id").primaryKey(),
-  postId: uuid("post_id").notNull().references(() => vendorPosts.id),
-  userId: integer("user_id").notNull().references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const vendorPostComments = pgTable("vendor_post_comments", {
-  id: serial("id").primaryKey(),
-  postId: uuid("post_id").notNull().references(() => vendorPosts.id),
-  userId: integer("user_id").notNull().references(() => users.id),
-  content: text("content").notNull(),
-  parentCommentId: integer("parent_comment_id"),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-export const conversations = pgTable("conversations", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  customerId: integer("customer_id").notNull().references(() => users.id),
-  vendorId: integer("vendor_id").notNull().references(() => users.id),
-  productId: uuid("product_id").references(() => products.id),
-  conversationType: text("conversation_type", { enum: ["QUOTE", "ORDER", "GENERAL"] }).notNull(),
-  status: text("status", { enum: ["ACTIVE", "CLOSED"] }).default("ACTIVE"),
-  lastMessage: text("last_message"),
-  lastMessageAt: timestamp("last_message_at").defaultNow(),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-export const chatMessages = pgTable("chat_messages", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  conversationId: uuid("conversation_id").notNull().references(() => conversations.id),
-  senderId: integer("sender_id").notNull().references(() => users.id),
-  content: text("content").notNull(),
-  messageType: text("message_type", { enum: ["TEXT", "QUOTE_REQUEST", "QUOTE_RESPONSE", "ORDER_UPDATE"] }).default("TEXT"),
-  attachedData: json("attached_data"),
-  isRead: boolean("is_read").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// Merchant profiles table (enhanced to match Prisma Vendor model)
+// Merchant Profiles table
 export const merchantProfiles = pgTable('merchant_profiles', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: integer('user_id').notNull().references(() => users.id),
-  businessName: varchar('business_name', { length: 255 }).notNull(),
+  businessName: varchar('business_name', { length: 255 }),
   businessType: varchar('business_type', { length: 100 }),
   businessDescription: text('business_description'),
-  businessAddress: text('business_address').notNull(),
+  businessAddress: text('business_address'),
   businessPhone: varchar('business_phone', { length: 20 }),
   businessEmail: varchar('business_email', { length: 255 }),
-  businessLogo: varchar('business_logo', { length: 500 }),
-  businessHours: text('business_hours'),
-  // Bank details for payments
-  accountName: varchar('account_name', { length: 255 }),
-  bankName: varchar('bank_name', { length: 255 }),
-  accountNumber: varchar('account_number', { length: 50 }),
-  bankCode: varchar('bank_code', { length: 20 }),
-  // Business registration details
-  businessCategory: varchar('business_category', { length: 100 }),
-  businessNumber: varchar('business_number', { length: 100 }),
+  businessWebsite: varchar('business_website', { length: 255 }),
+  businessHours: json('business_hours'),
+  socialMedia: json('social_media'),
+  businessLicense: varchar('business_license', { length: 255 }),
+  taxNumber: varchar('tax_number', { length: 100 }),
+  bankDetails: json('bank_details'),
   isVerified: boolean('is_verified').default(false),
-  subscriptionTier: varchar('subscription_tier', { length: 50 }).default('BASIC'),
-  rating: decimal('rating', { precision: 3, scale: 2 }).default('0'),
+  verificationStatus: varchar('verification_status', { length: 50 }).default('PENDING'),
+  verificationNotes: text('verification_notes'),
+  rating: decimal('rating', { precision: 3, scale: 2 }).default('0.00'),
   reviewCount: integer('review_count').default(0),
-  totalSales: decimal('total_sales', { precision: 12, scale: 2 }).default('0'),
-  totalOrders: integer('total_orders').default(0),
-  isDeleted: boolean('is_deleted').default(false),
+  totalSales: decimal('total_sales', { precision: 12, scale: 2 }).default('0.00'),
+  commissionRate: decimal('commission_rate', { precision: 5, scale: 2 }).default('5.00'),
+  businessCategoryId: uuid('business_category_id').references(() => businessCategories.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-  deletedAt: timestamp('deleted_at'),
 });
 
-export const merchantAnalytics = pgTable("merchant_analytics", {
-  id: serial("id").primaryKey(),
-  merchantId: integer("merchant_id").notNull().references(() => users.id),
-  date: timestamp("date").defaultNow(),
-  dailySales: decimal("daily_sales", { precision: 12, scale: 2 }).default("0"),
-  dailyOrders: integer("daily_orders").default(0),
-  dailyViews: integer("daily_views").default(0),
-  dailyClicks: integer("daily_clicks").default(0),
-  topProduct: uuid("top_product").references(() => products.id),
-  peakHour: integer("peak_hour"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-// Driver profiles table (enhanced to match Prisma Driver model)
+// Driver Profiles table
 export const driverProfiles = pgTable('driver_profiles', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: integer('user_id').notNull().references(() => users.id),
-  plateNumber: varchar('plate_number', { length: 20 }).notNull(), // From Prisma Driver model
-  driverTier: varchar('driver_tier', { length: 20 }).default('BASIC'),
-  accessLevel: varchar('access_level', { length: 20 }).default('STANDARD'),
-  maxCargoValue: decimal('max_cargo_value', { precision: 10, scale: 2 }).default('50000'),
+  licenseNumber: varchar('license_number', { length: 50 }),
+  licenseExpiry: timestamp('license_expiry'),
+  vehicleType: varchar('vehicle_type', { length: 50 }),
+  vehiclePlate: varchar('vehicle_plate', { length: 20 }),
+  vehicleModel: varchar('vehicle_model', { length: 100 }),
+  vehicleYear: integer('vehicle_year'),
+  vehicleColor: varchar('vehicle_color', { length: 50 }),
+  vehicleDocuments: json('vehicle_documents'),
+  driverTier: varchar('driver_tier', { length: 20 }).default('STANDARD'),
+  isAvailable: boolean('is_available').default(false),
+  isActive: boolean('is_active').default(true),
+  currentLatitude: decimal('current_latitude', { precision: 10, scale: 8 }),
+  currentLongitude: decimal('current_longitude', { precision: 11, scale: 8 }),
+  serviceTypes: json('service_types'),
+  maxCargoValue: decimal('max_cargo_value', { precision: 10, scale: 2 }),
+  rating: decimal('rating', { precision: 3, scale: 2 }).default('0.00'),
+  completedDeliveries: integer('completed_deliveries').default(0),
+  totalEarnings: decimal('total_earnings', { precision: 12, scale: 2 }).default('0.00'),
+  onlineHours: decimal('online_hours', { precision: 8, scale: 2 }).default('0.00'),
+  isVerified: boolean('is_verified').default(false),
+  verificationStatus: varchar('verification_status', { length: 50 }).default('PENDING'),
+  backgroundCheckStatus: varchar('background_check_status', { length: 50 }).default('PENDING'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Receipts table
+export const receipts = pgTable('receipts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  receiptNumber: varchar('receipt_number', { length: 100 }).notNull().unique(),
+  orderId: uuid('order_id').notNull().references(() => orders.id),
+  customerId: integer('customer_id').notNull().references(() => users.id),
+  merchantId: integer('merchant_id').notNull().references(() => users.id),
+  driverId: integer('driver_id').references(() => users.id),
+  totalAmount: varchar('total_amount', { length: 20 }).notNull(),
+  paymentMethod: varchar('payment_method', { length: 50 }).notNull(),
+  paymentStatus: varchar('payment_status', { length: 50 }).default('PENDING'),
+  transactionRef: varchar('transaction_ref', { length: 255 }),
+  qrCodeData: text('qr_code_data'),
+  qrCodeImageUrl: varchar('qr_code_image_url', { length: 500 }),
+  receiptPdfUrl: varchar('receipt_pdf_url', { length: 500 }),
+  deliveryStatus: varchar('delivery_status', { length: 50 }).default('PENDING'),
+  merchantVerifiedAt: timestamp('merchant_verified_at'),
+  merchantVerifiedBy: integer('merchant_verified_by').references(() => users.id),
+  deliveryVerifiedAt: timestamp('delivery_verified_at'),
+  deliveryVerifiedBy: integer('delivery_verified_by').references(() => users.id),
+  adminVerifiedAt: timestamp('admin_verified_at'),
+  adminVerifiedBy: integer('admin_verified_by').references(() => users.id),
+  metadata: json('metadata'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Notifications tables
+export const merchantNotifications = pgTable('merchant_notifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  merchantId: integer('merchant_id').notNull().references(() => users.id),
+  title: varchar('title', { length: 255 }).notNull(),
+  message: text('message').notNull(),
+  type: varchar('type', { length: 50 }).default('GENERAL'),
+  relatedId: varchar('related_id', { length: 255 }),
+  priority: varchar('priority', { length: 20 }).default('MEDIUM'),
+  actionUrl: varchar('action_url', { length: 500 }),
+  isRead: boolean('is_read').default(false),
+  readAt: timestamp('read_at'),
+  expiresAt: timestamp('expires_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const consumerNotifications = pgTable('consumer_notifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  consumerId: integer('consumer_id').notNull().references(() => users.id),
+  title: varchar('title', { length: 255 }).notNull(),
+  message: text('message').notNull(),
+  type: varchar('type', { length: 50 }).default('GENERAL'),
+  relatedId: varchar('related_id', { length: 255 }),
+  priority: varchar('priority', { length: 20 }).default('MEDIUM'),
+  actionUrl: varchar('action_url', { length: 500 }),
+  isRead: boolean('is_read').default(false),
+  readAt: timestamp('read_at'),
+  expiresAt: timestamp('expires_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const driverNotifications = pgTable('driver_notifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  driverId: integer('driver_id').notNull().references(() => users.id),
+  title: varchar('title', { length: 255 }).notNull(),
+  message: text('message').notNull(),
+  type: varchar('type', { length: 50 }).default('GENERAL'),
+  relatedId: varchar('related_id', { length: 255 }),
+  priority: varchar('priority', { length: 20 }).default('MEDIUM'),
+  actionUrl: varchar('action_url', { length: 500 }),
+  isRead: boolean('is_read').default(false),
+  readAt: timestamp('read_at'),
+  expiresAt: timestamp('expires_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Add missing tables for comprehensive functionality
+export const deliveryRequests = pgTable('delivery_requests', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  customerId: integer('customer_id').notNull().references(() => users.id),
+  merchantId: integer('merchant_id').references(() => users.id),
+  driverId: integer('driver_id').references(() => users.id),
+  orderId: uuid('order_id').references(() => orders.id),
+  deliveryType: varchar('delivery_type', { length: 50 }).notNull(),
+  cargoValue: varchar('cargo_value', { length: 20 }).default('0'),
+  requiresPremiumDriver: boolean('requires_premium_driver').default(false),
+  pickupAddress: text('pickup_address').notNull(),
+  deliveryAddress: text('delivery_address').notNull(),
+  estimatedDistance: varchar('estimated_distance', { length: 20 }),
+  estimatedDuration: integer('estimated_duration'),
+  deliveryFee: varchar('delivery_fee', { length: 20 }).notNull(),
+  scheduledPickupTime: timestamp('scheduled_pickup_time'),
+  actualPickupTime: timestamp('actual_pickup_time'),
+  actualDeliveryTime: timestamp('actual_delivery_time'),
+  specialInstructions: text('special_instructions'),
+  trackingNumber: varchar('tracking_number', { length: 100 }),
+  status: varchar('status', { length: 50 }).default('PENDING'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const conversations = pgTable('conversations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  customerId: integer('customer_id').notNull().references(() => users.id),
+  vendorId: integer('vendor_id').references(() => users.id),
+  productId: uuid('product_id').references(() => products.id),
+  conversationType: varchar('conversation_type', { length: 50 }).default('GENERAL'),
+  status: varchar('status', { length: 50 }).default('ACTIVE'),
+  lastMessage: text('last_message'),
+  lastMessageAt: timestamp('last_message_at'),
+  assignedTo: integer('assigned_to').references(() => users.id),
+  subject: varchar('subject', { length: 255 }),
+  priority: varchar('priority', { length: 20 }).default('MEDIUM'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const chatMessages = pgTable('chat_messages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  conversationId: uuid('conversation_id').notNull().references(() => conversations.id),
+  senderId: integer('sender_id').notNull().references(() => users.id),
+  content: text('content').notNull(),
+  messageType: varchar('message_type', { length: 50 }).default('TEXT'),
+  attachedData: json('attached_data'),
+  isRead: boolean('is_read').default(false),
+  readAt: timestamp('read_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Add missing tables for comprehensive functionality
+export const supportTickets = pgTable('support_tickets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ticketNumber: varchar('ticket_number', { length: 100 }).notNull().unique(),
+  userId: integer('user_id').references(() => users.id),
+  userRole: varchar('user_role', { length: 50 }).default('GUEST'),
+  name: varchar('name', { length: 255 }).notNull(),
+  email: varchar('email', { length: 255 }).notNull(),
+  subject: varchar('subject', { length: 255 }).notNull(),
+  message: text('message').notNull(),
+  status: varchar('status', { length: 50 }).default('OPEN'),
+  priority: varchar('priority', { length: 20 }).default('NORMAL'),
+  assignedTo: integer('assigned_to').references(() => users.id),
+  resolvedAt: timestamp('resolved_at'),
+  resolvedBy: integer('resolved_by').references(() => users.id),
+  resolution: text('resolution'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const ratings = pgTable('ratings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  customerId: integer('customer_id').notNull().references(() => users.id),
+  merchantId: integer('merchant_id').references(() => users.id),
+  productId: uuid('product_id').references(() => products.id),
+  orderId: uuid('order_id').references(() => orders.id),
+  rating: integer('rating').notNull(),
+  comment: text('comment'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Additional missing tables for advanced features
+export const transactions = pgTable('transactions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  recipientId: integer('recipient_id').references(() => users.id),
+  orderId: uuid('order_id').references(() => orders.id),
+  type: varchar('type', { length: 50 }).notNull(),
+  status: varchar('status', { length: 50 }).default('PENDING'),
+  amount: varchar('amount', { length: 20 }).notNull(),
+  fee: varchar('fee', { length: 20 }).default('0.00'),
+  netAmount: varchar('net_amount', { length: 20 }).notNull(),
+  currency: varchar('currency', { length: 10 }).default('NGN'),
+  paymentMethod: varchar('payment_method', { length: 50 }),
+  transactionRef: varchar('transaction_ref', { length: 255 }),
+  description: text('description'),
+  metadata: json('metadata'),
+  initiatedAt: timestamp('initiated_at').defaultNow(),
+  completedAt: timestamp('completed_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Tables for advanced functionality mentioned in routes
+export const vendorPosts = pgTable('vendor_posts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  vendorId: integer('vendor_id').notNull().references(() => users.id),
+  title: varchar('title', { length: 255 }).notNull(),
+  content: text('content').notNull(),
+  postType: varchar('post_type', { length: 50 }).notNull(),
+  productId: uuid('product_id').references(() => products.id),
+  images: json('images'),
+  tags: json('tags'),
+  originalPrice: varchar('original_price', { length: 20 }),
+  discountPrice: varchar('discount_price', { length: 20 }),
+  discountPercentage: integer('discount_percentage'),
+  validUntil: timestamp('valid_until'),
+  viewCount: integer('view_count').default(0),
+  likeCount: integer('like_count').default(0),
+  commentCount: integer('comment_count').default(0),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const vendorPostLikes = pgTable('vendor_post_likes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  postId: uuid('post_id').notNull().references(() => vendorPosts.id),
+  userId: integer('user_id').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const vendorPostComments = pgTable('vendor_post_comments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  postId: uuid('post_id').notNull().references(() => vendorPosts.id),
+  userId: integer('user_id').notNull().references(() => users.id),
+  content: text('content').notNull(),
+  parentCommentId: uuid('parent_comment_id').references(() => vendorPostComments.id),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Identity and verification tables
+export const identityVerifications = pgTable('identity_verifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  faceImageUrl: varchar('face_image_url', { length: 500 }).notNull(),
+  verificationStatus: varchar('verification_status', { length: 50 }).default('PENDING'),
+  verifiedAt: timestamp('verified_at'),
+  verifiedBy: integer('verified_by').references(() => users.id),
+  rejectionReason: text('rejection_reason'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const driverVerifications = pgTable('driver_verifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  licenseNumber: varchar('license_number', { length: 50 }).notNull(),
+  licenseExpiryDate: timestamp('license_expiry_date').notNull(),
+  licenseImageUrl: varchar('license_image_url', { length: 500 }),
   vehicleType: varchar('vehicle_type', { length: 50 }).notNull(),
   vehiclePlate: varchar('vehicle_plate', { length: 20 }).notNull(),
   vehicleModel: varchar('vehicle_model', { length: 100 }),
   vehicleYear: integer('vehicle_year'),
-  driverLicense: varchar('driver_license', { length: 50 }).notNull(),
-  vehicleDocuments: text('vehicle_documents'),
-  serviceTypes: text('service_types'),
-  specializations: text('specializations'),
+  verificationStatus: varchar('verification_status', { length: 50 }).default('PENDING'),
+  verifiedAt: timestamp('verified_at'),
+  verifiedBy: integer('verified_by').references(() => users.id),
+  rejectionReason: text('rejection_reason'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const phoneVerifications = pgTable('phone_verifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  phone: varchar('phone', { length: 20 }).notNull(),
+  otp: varchar('otp', { length: 10 }).notNull(),
+  isVerified: boolean('is_verified').default(false),
+  expiresAt: timestamp('expires_at').notNull(),
+  verifiedAt: timestamp('verified_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Additional advanced tables
+export const mfaConfigurations = pgTable('mfa_configurations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  isEnabled: boolean('is_enabled').default(false),
+  secret: varchar('secret', { length: 255 }).notNull(),
+  backupCodes: json('backup_codes'),
+  lastUsedAt: timestamp('last_used_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Add tables for advanced security and fraud detection
+export const fraudAlerts = pgTable('fraud_alerts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  type: varchar('type', { length: 50 }).notNull(),
+  severity: varchar('severity', { length: 20 }).notNull(),
+  status: varchar('status', { length: 20 }).default('ACTIVE'),
+  title: varchar('title', { length: 255 }).notNull(),
+  description: text('description').notNull(),
+  riskScore: integer('risk_score'),
+  metadata: json('metadata'),
+  detectedAt: timestamp('detected_at').defaultNow(),
+  resolvedAt: timestamp('resolved_at'),
+  resolvedBy: integer('resolved_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const suspiciousActivities = pgTable('suspicious_activities', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: integer('user_id').references(() => users.id),
+  activityType: varchar('activity_type', { length: 50 }).notNull(),
+  description: text('description').notNull(),
+  riskIndicators: json('risk_indicators'),
+  timestamp: timestamp('timestamp').defaultNow(),
+  ipAddress: varchar('ip_address', { length: 45 }),
+  deviceFingerprint: text('device_fingerprint'),
+  severity: varchar('severity', { length: 20 }).default('MEDIUM'),
+});
+
+export const blacklistedEntities = pgTable('blacklisted_entities', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  entityType: varchar('entity_type', { length: 50 }).notNull(),
+  entityValue: varchar('entity_value', { length: 255 }).notNull(),
+  reason: text('reason').notNull(),
+  blacklistedBy: integer('blacklisted_by').notNull().references(() => users.id),
   isActive: boolean('is_active').default(true),
-  isAvailable: boolean('is_available').default(false),
-  currentLatitude: decimal('current_latitude', { precision: 10, scale: 8 }),
-  currentLongitude: decimal('current_longitude', { precision: 11, scale: 8 }),
-  rating: decimal('rating', { precision: 3, scale: 2 }).default('0'),
-  totalRatings: integer('total_ratings').default(0),
-  totalDeliveries: integer('total_deliveries').default(0),
-  totalEarnings: decimal('total_earnings', { precision: 10, scale: 2 }).default('0'),
-  lastActiveAt: timestamp('last_active_at'),
-  isDeleted: boolean('is_deleted').default(false),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const accountFlags = pgTable('account_flags', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  flagType: varchar('flag_type', { length: 50 }).notNull(),
+  severity: varchar('severity', { length: 20 }).notNull(),
+  reason: text('reason').notNull(),
+  flaggedBy: integer('flagged_by').notNull().references(() => users.id),
+  status: varchar('status', { length: 20 }).default('ACTIVE'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-  deletedAt: timestamp('deleted_at'),
 });
 
-export const deliveryRequests = pgTable("delivery_requests", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  customerId: integer("customer_id").notNull().references(() => users.id),
-  merchantId: integer("merchant_id").references(() => users.id),
-  driverId: integer("driver_id").references(() => users.id),
-  orderId: uuid("order_id").references(() => orders.id),
-  deliveryType: text("delivery_type", { enum: ["FUEL", "PACKAGE", "FOOD", "GROCERY", "JEWELRY", "ELECTRONICS", "DOCUMENTS", "PHARMACEUTICALS", "HIGH_VALUE", "OTHER"] }).notNull(),
-  cargoValue: decimal("cargo_value", { precision: 12, scale: 2 }).default("0"),
-  requiresPremiumDriver: boolean("requires_premium_driver").default(false),
-  pickupAddress: text("pickup_address").notNull(),
-  deliveryAddress: text("delivery_address").notNull(),
-  pickupLocation: json("pickup_location"),
-  deliveryLocation: json("delivery_location"),
-  estimatedDistance: decimal("estimated_distance", { precision: 8, scale: 2 }),
-  estimatedDuration: integer("estimated_duration"),
-  deliveryFee: decimal("delivery_fee", { precision: 10, scale: 2 }).notNull(),
-  status: text("status", { enum: ["PENDING", "ASSIGNED", "PICKED_UP", "IN_TRANSIT", "DELIVERED", "CANCELLED"] }).default("PENDING"),
-  scheduledPickupTime: timestamp("scheduled_pickup_time"),
-  actualPickupTime: timestamp("actual_pickup_time"),
-  estimatedDeliveryTime: timestamp("estimated_delivery_time"),
-  actualDeliveryTime: timestamp("actual_delivery_time"),
-  specialInstructions: text("special_instructions"),
-  trackingNumber: text("tracking_number").unique(),
-  proofOfDelivery: text("proof_of_delivery"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// Merchant Notifications
-export const merchantNotifications = pgTable("merchant_notifications", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  merchantId: integer("merchant_id").notNull().references(() => users.id),
-  title: text("title").notNull(),
-  message: text("message").notNull(),
-  type: text("type", {
-    enum: ["ORDER", "PAYMENT", "DELIVERY", "PROMOTION", "SYSTEM", "REVIEW"]
-  }).notNull(),
-  relatedId: uuid("related_id"),
-  isRead: boolean("is_read").default(false),
-  priority: text("priority", { enum: ["LOW", "MEDIUM", "HIGH", "URGENT"] }).default("MEDIUM"),
-  actionUrl: text("action_url"),
-  createdAt: timestamp("created_at").defaultNow(),
-  readAt: timestamp("read_at"),
-});
-
-// Consumer Notifications
-export const consumerNotifications = pgTable("consumer_notifications", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  consumerId: integer("consumer_id").notNull().references(() => users.id),
-  title: text("title").notNull(),
-  message: text("message").notNull(),
-  type: text("type", {
-    enum: ["ORDER_STATUS", "DELIVERY_UPDATE", "PAYMENT", "PROMOTION", "SYSTEM", "REVIEW_REQUEST"]
-  }).notNull(),
-  relatedId: uuid("related_id"),
-  isRead: boolean("is_read").default(false),
-  priority: text("priority", { enum: ["LOW", "MEDIUM", "HIGH", "URGENT"] }).default("MEDIUM"),
-  actionUrl: text("action_url"),
-  createdAt: timestamp("created_at").defaultNow(),
-  readAt: timestamp("read_at"),
-});
-
-// Driver Notifications
-export const driverNotifications = pgTable("driver_notifications", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  driverId: integer("driver_id").notNull().references(() => users.id),
-  title: text("title").notNull(),
-  message: text("message").notNull(),
-  type: text("type", {
-    enum: ["DELIVERY_REQUEST", "PAYOUT_CONFIRMATION", "STATUS_UPDATE", "SYSTEM", "RATING"]
-  }).notNull(),
-  relatedId: uuid("related_id"),
-  isRead: boolean("is_read").default(false),
-  priority: text("priority", { enum: ["LOW", "MEDIUM", "HIGH", "URGENT"] }).default("MEDIUM"),
-  actionUrl: text("action_url"),
-  expiresAt: timestamp("expires_at"),
-  createdAt: timestamp("created_at").defaultNow(),
-  readAt: timestamp("read_at"),
-});
-
-// Support Tickets
-export const supportTickets = pgTable("support_tickets", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  ticketNumber: text("ticket_number").notNull().unique(),
-  userId: integer("user_id").references(() => users.id),
-  userRole: text("user_role", { enum: ["CONSUMER", "MERCHANT", "DRIVER", "GUEST"] }).notNull(),
-  name: text("name").notNull(),
-  email: text("email").notNull(),
-  subject: text("subject").notNull(),
-  message: text("message").notNull(),
-  status: text("status", { enum: ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"] }).default("OPEN"),
-  priority: text("priority", { enum: ["LOW", "NORMAL", "HIGH", "URGENT"] }).default("NORMAL"),
-  assignedTo: integer("assigned_to").references(() => users.id),
-  adminNotes: text("admin_notes"),
-  resolution: text("resolution"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-  resolvedAt: timestamp("resolved_at"),
-});
-
-// Identity Verification tables
-export const identityVerifications = pgTable("identity_verifications", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  verificationStatus: text("verification_status", { enum: ["PENDING", "APPROVED", "REJECTED"] }).default("PENDING"),
-  faceImageUrl: text("face_image_url"),
-  verificationDate: timestamp("verification_date"),
-  rejectionReason: text("rejection_reason"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const driverVerifications = pgTable("driver_verifications", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  licenseNumber: text("license_number").notNull(),
-  licenseExpiryDate: text("license_expiry_date").notNull(),
-  licenseImageUrl: text("license_image_url"),
-  vehicleType: text("vehicle_type").notNull(),
-  vehiclePlate: text("vehicle_plate").notNull(),
-  vehicleModel: text("vehicle_model"),
-  vehicleYear: text("vehicle_year"),
-  verificationStatus: text("verification_status", { enum: ["PENDING", "APPROVED", "REJECTED"] }).default("PENDING"),
-  verificationDate: timestamp("verification_date"),
-  rejectionReason: text("rejection_reason"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const phoneVerifications = pgTable("phone_verifications", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  phoneNumber: text("phone_number").notNull(),
-  otpCode: text("otp_code").notNull(),
-  isVerified: boolean("is_verified").default(false),
-  expiresAt: timestamp("expires_at").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-// MFA (Multi-Factor Authentication) table
-export const mfaConfigurations = pgTable("mfa_configurations", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id).notNull().unique(),
-  isEnabled: boolean("is_enabled").default(false),
-  secret: text("secret").notNull(),
-  backupCodes: text("backup_codes").array(),
-  lastUsedAt: timestamp("last_used_at"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// Trust & Safety - Fraud Detection
-export const fraudAlerts = pgTable("fraud_alerts", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: integer("user_id").references(() => users.id),
-  alertType: text("alert_type", {
-    enum: ["PAYMENT_MISMATCH", "SUSPICIOUS_ACTIVITY", "VELOCITY_CHECK", "IP_CHANGE", "DEVICE_CHANGE", "UNUSUAL_TRANSACTION"]
-  }).notNull(),
-  severity: text("severity", { enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"] }).notNull(),
-  description: text("description").notNull(),
-  metadata: jsonb("metadata"), // Store additional context data
-  isResolved: boolean("is_resolved").default(false),
-  resolvedBy: integer("resolved_by").references(() => users.id),
-  resolvedAt: timestamp("resolved_at"),
-  resolution: text("resolution"),
-  ipAddress: text("ip_address"),
-  userAgent: text("user_agent"),
-  relatedTransactionId: text("related_transaction_id"),
-  riskScore: decimal("risk_score", { precision: 3, scale: 2 }).default("0"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// Trust & Safety - Reports System
-export const reports = pgTable("reports", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  reporterId: integer("reporter_id").references(() => users.id),
-  reportedUserId: integer("reported_user_id").references(() => users.id),
-  reportedProductId: uuid("reported_product_id").references(() => products.id),
-  reportType: text("report_type", {
-    enum: ["USER_ABUSE", "PRODUCT_SCAM", "FAKE_LISTING", "INAPPROPRIATE_CONTENT", "FRAUD", "HARASSMENT", "SPAM", "OTHER"]
-  }).notNull(),
-  category: text("category", {
-    enum: ["SAFETY", "FRAUD", "CONTENT", "BEHAVIOR", "POLICY_VIOLATION"]
-  }).notNull(),
-  reason: text("reason").notNull(),
-  description: text("description").notNull(),
-  evidence: text("evidence").array(), // URLs to screenshots, documents, etc.
-  status: text("status", {
-    enum: ["PENDING", "UNDER_REVIEW", "RESOLVED", "DISMISSED", "ESCALATED"]
-  }).default("PENDING"),
-  priority: text("priority", { enum: ["LOW", "MEDIUM", "HIGH", "URGENT"] }).default("MEDIUM"),
-  assignedTo: integer("assigned_to").references(() => users.id),
-  adminNotes: text("admin_notes"),
-  resolution: text("resolution"),
-  actionTaken: text("action_taken", {
-    enum: ["NO_ACTION", "WARNING_SENT", "CONTENT_REMOVED", "USER_SUSPENDED", "USER_BANNED", "PRODUCT_REMOVED", "MERCHANT_RESTRICTED"]
-  }),
-  reporterAnonymous: boolean("reporter_anonymous").default(false),
-  ipAddress: text("ip_address"),
-  userAgent: text("user_agent"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-  resolvedAt: timestamp("resolved_at"),
-});
-
-// User Activity Tracking for Fraud Detection
-export const userActivities = pgTable("user_activities", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  activityType: text("activity_type", {
-    enum: ["LOGIN", "PAYMENT", "ORDER_PLACE", "PROFILE_UPDATE", "PASSWORD_CHANGE", "WITHDRAWAL", "REFUND"]
-  }).notNull(),
-  ipAddress: text("ip_address"),
-  userAgent: text("user_agent"),
-  deviceFingerprint: text("device_fingerprint"),
-  location: jsonb("location"), // { country, city, lat, lng }
-  sessionId: text("session_id"),
-  riskScore: decimal("risk_score", { precision: 3, scale: 2 }).default("0"),
-  flagged: boolean("flagged").default(false),
-  metadata: jsonb("metadata"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-// Blacklisted Entities
-export const blacklistedEntities = pgTable("blacklisted_entities", {
-  id: serial("id").primaryKey(),
-  entityType: text("entity_type", { enum: ["EMAIL", "PHONE", "IP", "DEVICE", "BANK_ACCOUNT"] }).notNull(),
-  entityValue: text("entity_value").notNull(),
-  reason: text("reason").notNull(),
-  addedBy: integer("added_by").references(() => users.id).notNull(),
-  isActive: boolean("is_active").default(true),
-  expiresAt: timestamp("expires_at"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// Fuel Inventory Schema
+// Add missing tables for fuel, toll, QR codes, wallets
 export const fuelInventory = pgTable('fuel_inventory', {
-  id: serial('id').primaryKey(),
+  id: uuid('id').primaryKey().defaultRandom(),
   merchantId: integer('merchant_id').notNull().references(() => users.id),
-  fuelType: text('fuel_type', {
-    enum: ['PETROL', 'DIESEL', 'KEROSENE', 'COOKING_GAS', 'INDUSTRIAL_GAS']
-  }).notNull(),
-  quantity: decimal('quantity', { precision: 12, scale: 2 }).notNull(),
-  unit: text('unit', { enum: ['LITERS', 'GALLONS', 'KG', 'TONS'] }).notNull(),
-  pricePerUnit: decimal('price_per_unit', { precision: 10, scale: 2 }).notNull(),
-  minimumOrderQuantity: decimal('minimum_order_quantity', { precision: 10, scale: 2 }).default('1'),
-  maximumOrderQuantity: decimal('maximum_order_quantity', { precision: 12, scale: 2 }),
+  fuelType: varchar('fuel_type', { length: 50 }).notNull(),
+  quantity: varchar('quantity', { length: 20 }).notNull(),
+  unit: varchar('unit', { length: 20 }).default('litres'),
+  pricePerUnit: varchar('price_per_unit', { length: 20 }).notNull(),
+  minimumOrderQuantity: varchar('minimum_order_quantity', { length: 20 }),
+  maximumOrderQuantity: varchar('maximum_order_quantity', { length: 20 }),
   isAvailable: boolean('is_available').default(true),
-  location: text('location'),
-  description: text('description'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
-// Fuel Orders Schema
 export const fuelOrders = pgTable('fuel_orders', {
-  id: serial('id').primaryKey(),
+  id: uuid('id').primaryKey().defaultRandom(),
   customerId: integer('customer_id').notNull().references(() => users.id),
   merchantId: integer('merchant_id').notNull().references(() => users.id),
-  driverId: integer('driver_id').references(() => users.id),
-  inventoryId: integer('inventory_id').notNull().references(() => fuelInventory.id),
-  orderType: text('order_type', { enum: ['BULK', 'SMALL_SCALE'] }).notNull(),
-  fuelType: text('fuel_type', {
-    enum: ['PETROL', 'DIESEL', 'KEROSENE', 'COOKING_GAS', 'INDUSTRIAL_GAS']
-  }).notNull(),
-  quantity: decimal('quantity', { precision: 12, scale: 2 }).notNull(),
-  unit: text('unit', { enum: ['LITERS', 'GALLONS', 'KG', 'TONS'] }).notNull(),
-  pricePerUnit: decimal('price_per_unit', { precision: 10, scale: 2 }).notNull(),
-  totalPrice: decimal('total_price', { precision: 12, scale: 2 }).notNull(),
+  inventoryId: uuid('inventory_id').notNull().references(() => fuelInventory.id),
+  orderType: varchar('order_type', { length: 50 }).notNull(),
+  fuelType: varchar('fuel_type', { length: 50 }).notNull(),
+  quantity: varchar('quantity', { length: 20 }).notNull(),
+  unit: varchar('unit', { length: 20 }).notNull(),
+  pricePerUnit: varchar('price_per_unit', { length: 20 }).notNull(),
+  totalPrice: varchar('total_price', { length: 20 }).notNull(),
   deliveryAddress: text('delivery_address').notNull(),
   deliveryDate: timestamp('delivery_date'),
-  status: text('status', {
-    enum: ['PENDING', 'CONFIRMED', 'PROCESSING', 'DISPATCHED', 'DELIVERED', 'CANCELLED']
-  }).default('PENDING'),
-  paymentStatus: text('payment_status', {
-    enum: ['PENDING', 'PAID', 'REFUNDED']
-  }).default('PENDING'),
   specialInstructions: text('special_instructions'),
-  orderNumber: text('order_number').unique(),
+  orderNumber: varchar('order_number', { length: 100 }).notNull(),
+  status: varchar('status', { length: 50 }).default('PENDING'),
+  paymentStatus: varchar('payment_status', { length: 50 }).default('PENDING'),
   estimatedDeliveryTime: timestamp('estimated_delivery_time'),
   actualDeliveryTime: timestamp('actual_delivery_time'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
-// Toll Gate Locations Schema
 export const tollLocations = pgTable('toll_locations', {
-  id: serial('id').primaryKey(),
-  name: text('name').notNull(),
-  location: text('location').notNull(),
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 255 }).notNull(),
+  location: varchar('location', { length: 255 }).notNull(),
   address: text('address').notNull(),
-  latitude: decimal('latitude', { precision: 10, scale: 8 }).notNull(),
-  longitude: decimal('longitude', { precision: 11, scale: 8 }).notNull(),
-  operatorId: integer('operator_id').references(() => users.id),
-  operatingHours: jsonb('operating_hours'), // { start: '06:00', end: '22:00' }
+  latitude: decimal('latitude', { precision: 10, scale: 8 }),
+  longitude: decimal('longitude', { precision: 11, scale: 8 }),
+  operatingHours: json('operating_hours'),
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
-// Toll Pricing Schema
 export const tollPricing = pgTable('toll_pricing', {
-  id: serial('id').primaryKey(),
-  locationId: integer('location_id').notNull().references(() => tollLocations.id),
-  vehicleType: text('vehicle_type', {
-    enum: ['MOTORCYCLE', 'CAR', 'BUS', 'TRUCK', 'TRAILER']
-  }).notNull(),
-  price: decimal('price', { precision: 10, scale: 2 }).notNull(),
-  currency: text('currency').default('NGN'),
+  id: uuid('id').primaryKey().defaultRandom(),
+  locationId: uuid('location_id').notNull().references(() => tollLocations.id),
+  vehicleType: varchar('vehicle_type', { length: 50 }).notNull(),
+  price: varchar('price', { length: 20 }).notNull(),
+  currency: varchar('currency', { length: 10 }).default('NGN'),
   isActive: boolean('is_active').default(true),
-  validFrom: timestamp('valid_from').defaultNow(),
-  validTo: timestamp('valid_to'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
-// Toll Payments Schema
 export const tollPayments = pgTable('toll_payments', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: integer('user_id').notNull().references(() => users.id),
-  locationId: integer('location_id').notNull().references(() => tollLocations.id),
-  vehicleType: text('vehicle_type', {
-    enum: ['MOTORCYCLE', 'CAR', 'BUS', 'TRUCK', 'TRAILER']
-  }).notNull(),
-  vehiclePlate: text('vehicle_plate').notNull(),
-  amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
-  currency: text('currency').default('NGN'),
-  paymentMethod: text('payment_method', {
-    enum: ['CARD', 'BANK_TRANSFER', 'WALLET', 'CASH']
-  }).notNull(),
-  paymentReference: text('payment_reference').notNull().unique(),
-  transactionId: text('transaction_id'),
-  status: text('status', {
-    enum: ['PENDING', 'SUCCESSFUL', 'FAILED', 'CANCELLED']
-  }).default('PENDING'),
-  receiptNumber: text('receipt_number').unique(),
-  qrCodeData: text('qr_code_data'),
-  qrCodeImageUrl: text('qr_code_image_url'),
-  paymentDate: timestamp('payment_date').defaultNow(),
-  verifiedAt: timestamp('verified_at'),
-  verifiedBy: integer('verified_by').references(() => users.id),
-  metadata: jsonb('metadata'), // Additional payment data
+  locationId: uuid('location_id').notNull().references(() => tollLocations.id),
+  vehicleType: varchar('vehicle_type', { length: 50 }).notNull(),
+  vehiclePlate: varchar('vehicle_plate', { length: 20 }).notNull(),
+  amount: varchar('amount', { length: 20 }).notNull(),
+  paymentMethod: varchar('payment_method', { length: 50 }).notNull(),
+  transactionRef: varchar('transaction_ref', { length: 255 }),
+  receiptNumber: varchar('receipt_number', { length: 100 }).notNull(),
+  qrCodeUrl: varchar('qr_code_url', { length: 500 }),
+  status: varchar('status', { length: 50 }).default('COMPLETED'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const qrCodes = pgTable('qr_codes', {
+  id: varchar('id', { length: 50 }).primaryKey(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  amount: varchar('amount', { length: 20 }).notNull(),
+  description: text('description'),
+  status: varchar('status', { length: 20 }).default('ACTIVE'),
+  expiresAt: timestamp('expires_at').notNull(),
+  usedAt: timestamp('used_at'),
+  usedBy: integer('used_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const wallets = pgTable('wallets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  balance: varchar('balance', { length: 20 }).default('0.00'),
+  currency: varchar('currency', { length: 10 }).default('NGN'),
+  isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
-// Relations
+// Security and logging tables
+export const securityLogs = pgTable('security_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: integer('user_id').references(() => users.id),
+  action: varchar('action', { length: 100 }).notNull(),
+  details: text('details'),
+  ipAddress: varchar('ip_address', { length: 45 }),
+  userAgent: text('user_agent'),
+  severity: varchar('severity', { length: 20 }).default('INFO'),
+  timestamp: timestamp('timestamp').defaultNow(),
+});
+
+export const trustedDevices = pgTable('trusted_devices', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  deviceToken: varchar('device_token', { length: 255 }).notNull(),
+  deviceName: varchar('device_name', { length: 100 }),
+  deviceType: varchar('device_type', { length: 50 }),
+  browserInfo: text('browser_info'),
+  isActive: boolean('is_active').default(true),
+  expiresAt: timestamp('expires_at').notNull(),
+  lastUsedAt: timestamp('last_used_at').defaultNow(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Content moderation tables
+export const contentReports = pgTable('content_reports', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  reportedBy: integer('reported_by').notNull().references(() => users.id),
+  contentType: varchar('content_type', { length: 50 }).notNull(),
+  contentId: varchar('content_id', { length: 255 }).notNull(),
+  reason: text('reason').notNull(),
+  status: varchar('status', { length: 20 }).default('PENDING'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const moderationResponses = pgTable('moderation_responses', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  reportId: uuid('report_id').notNull().references(() => contentReports.id),
+  adminId: integer('admin_id').notNull().references(() => users.id),
+  response: text('response').notNull(),
+  action: varchar('action', { length: 50 }).notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Define relations - simplified to avoid the error
 export const usersRelations = relations(users, ({ many, one }) => ({
+  merchantProfile: one(merchantProfiles, {
+    fields: [users.id],
+    references: [merchantProfiles.userId],
+  }),
+  driverProfile: one(driverProfiles, {
+    fields: [users.id],
+    references: [driverProfiles.userId],
+  }),
   products: many(products),
   orders: many(orders),
   cartItems: many(cartItems),
-  vendorPosts: many(vendorPosts),
-  vendorPostLikes: many(vendorPostLikes),
-  vendorPostComments: many(vendorPostComments),
-  merchantProfile: one(merchantProfiles),
-  driverProfile: one(driverProfiles),
-  userLocations: many(userLocations),
-  sentMessages: many(chatMessages),
-  customerConversations: many(conversations, { relationName: "customerConversations" }),
-  vendorConversations: many(conversations, { relationName: "vendorConversations" }),
-  deliveryRequests: many(deliveryRequests),
-  merchantNotifications: many(merchantNotifications),
-  consumerNotifications: many(consumerNotifications),
-  driverNotifications: many(driverNotifications),
-  supportTickets: many(supportTickets),
-  identityVerifications: many(identityVerifications),
-  driverVerifications: many(driverVerifications),
-  phoneVerifications: many(phoneVerifications),
-  mfaConfiguration: one(mfaConfigurations),
-  tollPayments: many(tollPayments),
-  operatedTollLocations: many(tollLocations),
-}));
-
-export const merchantNotificationsRelations = relations(merchantNotifications, ({ one }) => ({
-  merchant: one(users, { fields: [merchantNotifications.merchantId], references: [users.id] }),
-}));
-
-export const consumerNotificationsRelations = relations(consumerNotifications, ({ one }) => ({
-  consumer: one(users, { fields: [consumerNotifications.consumerId], references: [users.id] }),
-}));
-
-export const driverNotificationsRelations = relations(driverNotifications, ({ one }) => ({
-  driver: one(users, { fields: [driverNotifications.driverId], references: [users.id] }),
-}));
-
-export const supportTicketsRelations = relations(supportTickets, ({ one }) => ({
-  user: one(users, { fields: [supportTickets.userId], references: [users.id] }),
-  assignedTo: one(users, { fields: [supportTickets.assignedTo], references: [users.id] }),
-}));
-
-export const identityVerificationsRelations = relations(identityVerifications, ({ one }) => ({
-  user: one(users, { fields: [identityVerifications.userId], references: [users.id] }),
-}));
-
-export const driverVerificationsRelations = relations(driverVerifications, ({ one }) => ({
-  user: one(users, { fields: [driverVerifications.userId], references: [users.id] }),
-}));
-
-export const phoneVerificationsRelations = relations(phoneVerifications, ({ one }) => ({
-  user: one(users, { fields: [phoneVerifications.userId], references: [users.id] }),
-}));
-
-export const mfaConfigurationsRelations = relations(mfaConfigurations, ({ one }) => ({
-  user: one(users, { fields: [mfaConfigurations.userId], references: [users.id] }),
-}));
-
-export const fraudAlertsRelations = relations(fraudAlerts, ({ one }) => ({
-  user: one(users, { fields: [fraudAlerts.userId], references: [users.id] }),
-  resolvedBy: one(users, { fields: [fraudAlerts.resolvedBy], references: [users.id] }),
-}));
-
-export const reportsRelations = relations(reports, ({ one }) => ({
-  reporter: one(users, { fields: [reports.reporterId], references: [users.id] }),
-  reportedUser: one(users, { fields: [reports.reportedUserId], references: [users.id] }),
-  reportedProduct: one(products, { fields: [reports.reportedProductId], references: [products.id] }),
-  assignedTo: one(users, { fields: [reports.assignedTo], references: [users.id] }),
-}));
-
-export const userActivitiesRelations = relations(userActivities, ({ one }) => ({
-  user: one(users, { fields: [userActivities.userId], references: [users.id] }),
-}));
-
-export const blacklistedEntitiesRelations = relations(blacklistedEntities, ({ one }) => ({
-  addedBy: one(users, { fields: [blacklistedEntities.addedBy], references: [users.id] }),
 }));
 
 export const productsRelations = relations(products, ({ one, many }) => ({
-  category: one(categories, { fields: [products.categoryId], references: [categories.id] }),
-  seller: one(users, { fields: [products.sellerId], references: [users.id] }),
+  seller: one(users, {
+    fields: [products.sellerId],
+    references: [users.id],
+  }),
+  category: one(categories, {
+    fields: [products.categoryId],
+    references: [categories.id],
+  }),
   orders: many(orders),
   cartItems: many(cartItems),
-  vendorPosts: many(vendorPosts),
 }));
 
 export const ordersRelations = relations(orders, ({ one }) => ({
-  buyer: one(users, { fields: [orders.buyerId], references: [users.id] }),
-  seller: one(users, { fields: [orders.sellerId], references: [users.id] }),
-  product: one(products, { fields: [orders.productId], references: [products.id] }),
-  driver: one(users, { fields: [orders.driverId], references: [users.id] }),
-}));
-
-export const vendorPostsRelations = relations(vendorPosts, ({ one, many }) => ({
-  vendor: one(users, { fields: [vendorPosts.vendorId], references: [users.id] }),
-  product: one(products, { fields: [vendorPosts.productId], references: [products.id] }),
-  likes: many(vendorPostLikes),
-  comments: many(vendorPostComments),
-}));
-
-export const conversationsRelations = relations(conversations, ({ one, many }) => ({
-  customer: one(users, { fields: [conversations.customerId], references: [users.id], relationName: "customerConversations" }),
-  vendor: one(users, { fields: [conversations.vendorId], references: [users.id], relationName: "vendorConversations" }),
-  product: one(products, { fields: [conversations.productId], references: [products.id] }),
-  messages: many(chatMessages),
-}));
-
-export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
-  conversation: one(conversations, { fields: [chatMessages.conversationId], references: [conversations.id] }),
-  sender: one(users, { fields: [chatMessages.senderId], references: [users.id] }),
-}));
-
-// Fuel Inventory Relations
-export const fuelInventoryRelations = relations(fuelInventory, ({ one, many }) => ({
-  merchant: one(users, { fields: [fuelInventory.merchantId], references: [users.id] }),
-  fuelOrders: many(fuelOrders),
-}));
-
-// Fuel Orders Relations
-export const fuelOrdersRelations = relations(fuelOrders, ({ one }) => ({
-  customer: one(users, { fields: [fuelOrders.customerId], references: [users.id] }),
-  merchant: one(users, { fields: [fuelOrders.merchantId], references: [users.id] }),
-  driver: one(users, { fields: [fuelOrders.driverId], references: [users.id] }),
-  inventory: one(fuelInventory, { fields: [fuelOrders.inventoryId], references: [fuelInventory.id] }),
-}));
-
-// Toll Location Relations
-export const tollLocationsRelations = relations(tollLocations, ({ one, many }) => ({
-  operator: one(users, { fields: [tollLocations.operatorId], references: [users.id] }),
-  pricing: many(tollPricing),
-  payments: many(tollPayments),
-}));
-
-// Toll Pricing Relations
-export const tollPricingRelations = relations(tollPricing, ({ one }) => ({
-  location: one(tollLocations, { fields: [tollPricing.locationId], references: [tollLocations.id] }),
-}));
-
-// Toll Payment Relations
-export const tollPaymentsRelations = relations(tollPayments, ({ one }) => ({
-  user: one(users, { fields: [tollPayments.userId], references: [users.id] }),
-  location: one(tollLocations, { fields: [tollPayments.locationId], references: [tollLocations.id] }),
-  verifiedBy: one(users, { fields: [tollPayments.verifiedBy], references: [users.id] }),
-}));
-
-// Receipt relations
-export const receiptsRelations = relations(receipts, ({ one }) => ({
-  order: one(orders, {
-    fields: [receipts.orderId],
-    references: [orders.id],
-  }),
-  customer: one(users, {
-    fields: [receipts.customerId],
+  buyer: one(users, {
+    fields: [orders.buyerId],
     references: [users.id],
   }),
-  merchant: one(users, {
-    fields: [receipts.merchantId],
+  seller: one(users, {
+    fields: [orders.sellerId],
     references: [users.id],
   }),
-  driver: one(users, {
-    fields: [receipts.driverId],
-    references: [users.id],
+  product: one(products, {
+    fields: [orders.productId],
+    references: [products.id],
   }),
 }));
 
-// Validation schemas
-export const insertUserSchema = createInsertSchema(users);
-export const insertProductSchema = createInsertSchema(products);
-export const insertOrderSchema = createInsertSchema(orders);
-export const insertCartItemSchema = createInsertSchema(cartItems);
-export const insertVendorPostSchema = createInsertSchema(vendorPosts);
-export const insertConversationSchema = createInsertSchema(conversations);
-export const insertChatMessageSchema = createInsertSchema(chatMessages);
-export const insertMerchantProfileSchema = createInsertSchema(merchantProfiles);
-export const insertDriverProfileSchema = createInsertSchema(driverProfiles);
-export const insertDeliveryRequestSchema = createInsertSchema(deliveryRequests);
-export const insertMerchantNotificationSchema = createInsertSchema(merchantNotifications);
-export const insertConsumerNotificationSchema = createInsertSchema(consumerNotifications);
-export const insertDriverNotificationSchema = createInsertSchema(driverNotifications);
-export const insertSupportTicketSchema = createInsertSchema(supportTickets);
-export const insertIdentityVerificationSchema = createInsertSchema(identityVerifications);
-export const insertDriverVerificationSchema = createInsertSchema(driverVerifications);
-export const insertPhoneVerificationSchema = createInsertSchema(phoneVerifications);
-export const insertMfaConfigurationSchema = createInsertSchema(mfaConfigurations);
-export const insertReceiptSchema = createInsertSchema(receipts);
-export const insertFraudAlertSchema = createInsertSchema(fraudAlerts);
-export const insertReportSchema = createInsertSchema(reports);
-export const insertUserActivitySchema = createInsertSchema(userActivities);
-export const insertBlacklistedEntitySchema = createInsertSchema(blacklistedEntities);
-export const insertFuelInventorySchema = createInsertSchema(fuelInventory);
-export const insertFuelOrderSchema = createInsertSchema(fuelOrders);
-export const insertTollLocationSchema = createInsertSchema(tollLocations);
-export const insertTollPricingSchema = createInsertSchema(tollPricing);
-export const insertTollPaymentSchema = createInsertSchema(tollPayments);
-export const insertWalletSchema = createInsertSchema(wallets);
-export const insertTransactionSchema = createInsertSchema(transactions);
-export const insertRatingSchema = createInsertSchema(ratings);
-export const insertDeliveryFeedbackSchema = createInsertSchema(deliveryFeedback);
-export const insertNotificationSchema = createInsertSchema(notifications);
-export const insertErrorLogSchema = createInsertSchema(errorLogs);
-export const insertMfaTokenSchema = createInsertSchema(mfaTokens);
-export const insertVerificationDocumentSchema = createInsertSchema(verificationDocuments);
-export const insertSecurityLogSchema = createInsertSchema(securityLogs);
-export const insertTrustedDeviceSchema = createInsertSchema(trustedDevices);
-export const insertSuspiciousActivitySchema = createInsertSchema(suspiciousActivities);
-export const insertAdminUserSchema = createInsertSchema(adminUsers);
-export const insertComplianceDocumentSchema = createInsertSchema(complianceDocuments);
-export const insertContentReportSchema = createInsertSchema(contentReports);
-export const insertModerationResponseSchema = createInsertSchema(moderationResponses);
-export const insertPaymentMethodSchema = createInsertSchema(paymentMethods);
-export const insertAdminPaymentActionSchema = createInsertSchema(adminPaymentActions);
-export const insertAccountFlagSchema = createInsertSchema(accountFlags);
-export const insertAuditLogSchema = createInsertSchema(auditLogs);
-export const insertOrderTrackingSchema = createInsertSchema(orderTracking);
-
-export type User = typeof users.$inferSelect;
-export type NewUser = typeof users.$inferInsert;
-export type FuelInventory = typeof fuelInventory.$inferSelect;
-export type NewFuelInventory = typeof fuelInventory.$inferInsert;
-export type FuelOrder = typeof fuelOrders.$inferSelect;
-export type NewFuelOrder = typeof fuelOrders.$inferInsert;
-export type TollLocation = typeof tollLocations.$inferSelect;
-export type NewTollLocation = typeof tollLocations.$inferInsert;
-export type TollPricing = typeof tollPricing.$inferSelect;
-export type NewTollPricing = typeof tollPricing.$inferInsert;
-export type TollPayment = typeof tollPayments.$inferSelect;
-export type NewTollPayment = typeof tollPayments.$insert;
-export type Product = typeof products.$inferSelect;
-export type NewProduct = typeof products.$insert;
-export type Order = typeof orders.$inferSelect;
-export type NewOrder = typeof orders.$insert;
-export type CartItem = typeof cartItems.$inferSelect;
-export type NewCartItem = typeof cartItems.$insert;
-export type VendorPost = typeof vendorPosts.$inferSelect;
-export type NewVendorPost = typeof vendorPosts.$insert;
-export type Conversation = typeof conversations.$inferSelect;
-export type NewConversation = typeof conversations.$insert;
-export type ChatMessage = typeof chatMessages.$inferSelect;
-export type NewChatMessage = typeof chatMessages.$insert;
-export type MerchantProfile = typeof merchantProfiles.$inferSelect;
-export type NewMerchantProfile = typeof merchantProfiles.$insert;
-export type DriverProfile = typeof driverProfiles.$inferSelect;
-export type NewDriverProfile = typeof driverProfiles.$insert;
-export type DeliveryRequest = typeof deliveryRequests.$inferSelect;
-export type NewDeliveryRequest = typeof deliveryRequests.$insert;
-export type MerchantNotification = typeof merchantNotifications.$inferSelect;
-export type NewMerchantNotification = typeof merchantNotifications.$insert;
-export type ConsumerNotification = typeof consumerNotifications.$inferSelect;
-export type NewConsumerNotification = typeof consumerNotifications.$insert;
-export type DriverNotification = typeof driverNotifications.$inferSelect;
-export type NewDriverNotification = typeof driverNotifications.$insert;
-export type SupportTicket = typeof supportTickets.$inferSelect;
-export type NewSupportTicket = typeof supportTickets.$insert;
-export type IdentityVerification = typeof identityVerifications.$inferSelect;
-export type NewIdentityVerification = typeof identityVerifications.$insert;
-export type DriverVerification = typeof driverVerifications.$inferSelect;
-export type NewDriverVerification = typeof driverVerifications.$insert;
-export type PhoneVerification = typeof phoneVerifications.$inferSelect;
-export type NewPhoneVerification = typeof phoneVerifications.$insert;
-export type MfaConfiguration = typeof mfaConfigurations.$inferSelect;
-export type NewMfaConfiguration = typeof mfaConfigurations.$insert;
-export type Receipt = typeof receipts.$inferSelect;
-export type NewReceipt = typeof receipts.$insert;
-export type FraudAlert = typeof fraudAlerts.$inferSelect;
-export type NewFraudAlert = typeof fraudAlerts.$insert;
-export type Report = typeof reports.$inferSelect;
-export type NewReport = typeof reports.$insert;
-export type UserActivity = typeof userActivities.$inferSelect;
-export type NewUserActivity = typeof userActivities.$insert;
-export type BlacklistedEntity = typeof blacklistedEntities.$inferSelect;
-export type NewBlacklistedEntity = typeof blacklistedEntities.$insert;
-export type Wallet = typeof wallets.$inferSelect;
-export type NewWallet = typeof wallets.$inferInsert;
-export type Transaction = typeof transactions.$inferSelect;
-export type NewTransaction = typeof transactions.$insert;
-export type Rating = typeof ratings.$inferSelect;
-export type NewRating = typeof ratings.$insert;
-export type DeliveryFeedback = typeof deliveryFeedback.$inferSelect;
-export type NewDeliveryFeedback = typeof deliveryFeedback.$insert;
-export type Notification = typeof notifications.$inferSelect;
-export type NewNotification = typeof notifications.$insert;
-export type ErrorLog = typeof errorLogs.$inferSelect;
-export type NewErrorLog = typeof errorLogs.$insert;
-export type MfaToken = typeof mfaTokens.$inferSelect;
-export type NewMfaToken = typeof mfaTokens.$insert;
-export type VerificationDocument = typeof verificationDocuments.$inferSelect;
-export type NewVerificationDocument = typeof verificationDocuments.$insert;
-export type SecurityLog = typeof securityLogs.$inferSelect;
-export type NewSecurityLog = typeof securityLogs.$insert;
-export type TrustedDevice = typeof trustedDevices.$inferSelect;
-export type NewTrustedDevice = typeof trustedDevices.$insert;
-export type SuspiciousActivity = typeof suspiciousActivities.$inferSelect;
-export type NewSuspiciousActivity = typeof suspiciousActivities.$insert;
-export type AdminUser = typeof adminUsers.$inferSelect;
-export type NewAdminUser = typeof adminUsers.$insert;
-export type ComplianceDocument = typeof complianceDocuments.$inferSelect;
-export type NewComplianceDocument = typeof complianceDocuments.$insert;
-export type ContentReport = typeof contentReports.$inferSelect;
-export type NewContentReport = typeof contentReports.$insert;
-export type ModerationResponse = typeof moderationResponses.$inferSelect;
-export type NewModerationResponse = typeof moderationResponses.$insert;
-export type PaymentMethod = typeof paymentMethods.$inferSelect;
-export type NewPaymentMethod = typeof paymentMethods.$insert;
-export type AdminPaymentAction = typeof adminPaymentActions.$inferSelect;
-export type NewAdminPaymentAction = typeof adminPaymentActions.$insert;
-export type AccountFlag = typeof accountFlags.$inferSelect;
-export type NewAccountFlag = typeof accountFlags.$insert;
-export type AuditLog = typeof auditLogs.$inferSelect;
-export type NewAuditLog = typeof auditLogs.$insert;
-export type OrderTracking = typeof orderTracking.$inferSelect;
-export type NewOrderTracking = typeof orderTracking.$insert;
+// Export all table schemas for validation
+export const addCommoditySchema = createInsertSchema(products);
+export const updateCommoditySchema = addCommoditySchema.partial();
+export const addToCartSchema = createInsertSchema(cartItems);
+export const updateCartItemSchema = addToCartSchema.partial();
