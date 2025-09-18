@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "postgresql-16"]
+modules = ["nodejs-18"]
 [agent]
 expertMode = true
 integrations = ["javascript_supabase:1.0.0"]
