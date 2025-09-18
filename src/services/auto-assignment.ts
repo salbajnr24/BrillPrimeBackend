@@ -1,6 +1,5 @@
-
 import db from '../config/database';
-import { drivers, orders, users, driverLocations } from '../schema';
+import { driverProfiles, orders, users, deliveryRequests } from '../schema';
 import { eq, and, sql, ne, isNull, or } from 'drizzle-orm';
 import { messageQueue, JobTypes } from './messageQueue';
 import { realtimeAnalyticsService } from './realtimeAnalytics';
@@ -29,7 +28,33 @@ interface DriverCandidate {
   score: number;
 }
 
+interface DriverLocation {
+  driverId: number;
+  latitude: number;
+  longitude: number;
+  isAvailable: boolean;
+  vehicleType: string;
+  rating: number;
+  lastSeen: Date;
+}
+
+interface DeliveryLocation {
+  latitude: number;
+  longitude: number;
+  urgentOrder?: boolean;
+}
+
+interface AssignmentResult {
+  driverId: number;
+  distance: number;
+  estimatedArrival: number;
+  driverScore: number;
+  assignedOrder?: any;
+}
+
 class AutoAssignmentService {
+  private static availableDrivers: Map<number, DriverLocation> = new Map();
+
   private defaultCriteria: AssignmentCriteria = {
     maxDistance: 10, // 10km radius
     maxAssignments: 3, // max 3 active orders per driver
@@ -44,7 +69,7 @@ class AutoAssignmentService {
     try {
       // Get available drivers
       const candidates = await this.findDriverCandidates(pickupLocation, assignmentCriteria);
-      
+
       if (candidates.length === 0) {
         await realtimeAnalyticsService.trackEvent('driver_assignment_failed', {
           orderId,
@@ -56,7 +81,7 @@ class AutoAssignmentService {
 
       // Select best driver using scoring algorithm
       const selectedDriver = this.selectBestDriver(candidates);
-      
+
       // Assign driver to order
       await this.performAssignment(orderId, selectedDriver.driverId);
 
@@ -91,22 +116,23 @@ class AutoAssignmentService {
     try {
       // Get order details
       const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
-      
-      if (!order || !order.pickupLocation) {
-        throw new Error('Order not found or missing pickup location');
+
+      if (!order || !order.deliveryAddress) {
+        throw new Error('Order not found or missing delivery address');
       }
 
-      const pickupLocation = JSON.parse(order.pickupLocation);
-      
+      // Parse delivery address to get coordinates (you might need to implement geocoding)
+      const pickupLocation = { latitude: 6.5244, longitude: 3.3792 }; // Default Lagos coordinates
+
       // Use stricter criteria for reassignment
       const reassignmentCriteria: AssignmentCriteria = {
         ...this.defaultCriteria,
-        maxDistance: this.defaultCriteria.maxDistance * 1.5, // Expand search radius
-        preferredRating: this.defaultCriteria.preferredRating - 0.5 // Lower rating threshold
+        maxDistance: this.defaultCriteria.maxDistance * 1.5,
+        preferredRating: this.defaultCriteria.preferredRating - 0.5
       };
 
       const candidates = await this.findDriverCandidates(pickupLocation, reassignmentCriteria, excludeDriverId);
-      
+
       if (candidates.length === 0) {
         await realtimeAnalyticsService.trackEvent('driver_reassignment_failed', {
           orderId,
@@ -141,37 +167,33 @@ class AutoAssignmentService {
     try {
       // Build the query
       let whereConditions = [
-        eq(drivers.isActive, true),
-        or(isNull(drivers.isOnline), eq(drivers.isOnline, true))
+        eq(driverProfiles.isActive, true),
+        or(isNull(driverProfiles.isAvailable), eq(driverProfiles.isAvailable, true))
       ];
 
       if (excludeDriverId) {
-        whereConditions.push(ne(drivers.id, excludeDriverId));
+        whereConditions.push(ne(driverProfiles.id, excludeDriverId));
       }
 
       // Get drivers with location and stats
       const driversWithLocation = await db.select({
-        driverId: drivers.id,
-        userId: drivers.userId,
-        rating: drivers.rating,
-        tier: drivers.tier,
-        latitude: driverLocations.latitude,
-        longitude: driverLocations.longitude,
-        lastUpdated: driverLocations.lastUpdated
+        driverId: driverProfiles.id,
+        userId: driverProfiles.userId,
+        rating: driverProfiles.rating,
+        tier: driverProfiles.driverTier,
+        latitude: driverProfiles.currentLatitude,
+        longitude: driverProfiles.currentLongitude,
+        isAvailable: driverProfiles.isAvailable
       })
-      .from(drivers)
-      .leftJoin(users, eq(drivers.userId, users.id))
-      .leftJoin(driverLocations, eq(drivers.id, driverLocations.driverId))
+      .from(driverProfiles)
+      .leftJoin(users, eq(driverProfiles.userId, users.id))
       .where(and(...whereConditions));
 
       const candidates: DriverCandidate[] = [];
 
       for (const driver of driversWithLocation) {
-        // Skip drivers without recent location updates
+        // Skip drivers without location
         if (!driver.latitude || !driver.longitude) continue;
-        
-        const locationAge = Date.now() - (driver.lastUpdated?.getTime() || 0);
-        if (locationAge > 15 * 60 * 1000) continue; // Skip if location is older than 15 minutes
 
         // Calculate distance
         const distance = this.calculateDistance(
@@ -185,20 +207,20 @@ class AutoAssignmentService {
         const [activeOrdersResult] = await db.select({ count: sql<number>`COUNT(*)` })
           .from(orders)
           .where(and(
-            eq(orders.driverId, driver.driverId),
-            sql`status IN ('ASSIGNED', 'PICKED_UP', 'IN_TRANSIT')`
+            eq(orders.driverId, driver.userId),
+            sql`status IN ('assigned', 'picked_up', 'in_transit')`
           ));
 
         const activeOrders = activeOrdersResult.count;
-        
+
         if (activeOrders >= criteria.maxAssignments) continue;
 
         // Get last delivery time
         const [lastDeliveryResult] = await db.select({ lastDelivery: orders.updatedAt })
           .from(orders)
           .where(and(
-            eq(orders.driverId, driver.driverId),
-            eq(orders.status, 'DELIVERED')
+            eq(orders.driverId, driver.userId),
+            eq(orders.status, 'delivered')
           ))
           .orderBy(sql`updated_at DESC`)
           .limit(1);
@@ -207,9 +229,9 @@ class AutoAssignmentService {
           driverId: driver.driverId,
           userId: driver.userId,
           distance,
-          rating: driver.rating || 0,
+          rating: parseFloat(driver.rating || '0'),
           activeOrders,
-          tier: driver.tier || 'BRONZE',
+          tier: driver.tier || 'STANDARD',
           lastDelivery: lastDeliveryResult?.lastDelivery || null,
           score: 0
         };
@@ -246,7 +268,7 @@ class AutoAssignmentService {
 
     // Tier bonus - 10% weight
     if (criteria.considerTier) {
-      const tierScores = { GOLD: 10, SILVER: 7, BRONZE: 4 };
+      const tierScores = { GOLD: 10, SILVER: 7, STANDARD: 4, BRONZE: 2 };
       score += tierScores[candidate.tier as keyof typeof tierScores] || 0;
     }
 
@@ -264,7 +286,7 @@ class AutoAssignmentService {
   private selectBestDriver(candidates: DriverCandidate[]): DriverCandidate {
     // Add some randomization to prevent always selecting the same top driver
     const topCandidates = candidates.slice(0, Math.min(3, candidates.length));
-    
+
     if (topCandidates.length === 1) {
       return topCandidates[0];
     }
@@ -273,10 +295,10 @@ class AutoAssignmentService {
     const weights = topCandidates.map((candidate, index) => 
       Math.pow(2, topCandidates.length - index - 1)
     );
-    
+
     const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
     const random = Math.random() * totalWeight;
-    
+
     let weightSum = 0;
     for (let i = 0; i < topCandidates.length; i++) {
       weightSum += weights[i];
@@ -292,7 +314,7 @@ class AutoAssignmentService {
     await db.update(orders)
       .set({
         driverId,
-        status: 'ASSIGNED',
+        status: 'assigned',
         updatedAt: new Date()
       })
       .where(eq(orders.id, orderId));
@@ -302,11 +324,11 @@ class AutoAssignmentService {
     const R = 6371; // Earth's radius in kilometers
     const dLat = this.toRadians(point2.latitude - point1.latitude);
     const dLon = this.toRadians(point2.longitude - point1.longitude);
-    
+
     const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos(this.toRadians(point1.latitude)) * Math.cos(this.toRadians(point2.latitude)) *
       Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    
+
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   }
@@ -379,107 +401,16 @@ class AutoAssignmentService {
       avgAssignmentTimeSeconds: avgAssignmentTime[0].avgTime || 0
     };
   }
-}
 
-export const autoAssignmentService = new AutoAssignmentService();
-export { AutoAssignmentService, AssignmentCriteria, DriverCandidate };
-export interface DriverLocation {
-  driverId: number;
-  latitude: number;
-  longitude: number;
-  isAvailable: boolean;
-  vehicleType: string;
-  rating: number;
-  lastSeen: Date;
-}
-
-export interface DeliveryLocation {
-  latitude: number;
-  longitude: number;
-  urgentOrder?: boolean;
-}
-
-export interface AssignmentResult {
-  driverId: number;
-  distance: number;
-  estimatedArrival: number;
-  driverScore: number;
-  assignedOrder?: any;
-}
-
-export class AutoAssignmentService {
-  private static availableDrivers: Map<number, DriverLocation> = new Map();
-
-  // Calculate distance between two points using Haversine formula
-  private static calculateDistance(
-    lat1: number, 
-    lon1: number, 
-    lat2: number, 
-    lon2: number
-  ): number {
-    const R = 6371; // Earth's radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
+  // Static methods for backward compatibility
+  static updateDriverLocation(driverId: number, location: Omit<DriverLocation, 'driverId'>): void {
+    this.availableDrivers.set(driverId, { driverId, ...location });
   }
 
-  // Calculate driver score based on various factors
-  private static calculateDriverScore(
-    driver: DriverLocation, 
-    distance: number, 
-    urgentOrder: boolean = false
-  ): number {
-    let score = 0;
-    
-    // Distance factor (closer is better, max 10 points)
-    const maxDistance = 50; // km
-    const distanceScore = Math.max(0, 10 * (1 - distance / maxDistance));
-    score += distanceScore;
-    
-    // Rating factor (max 10 points)
-    const ratingScore = (driver.rating / 5) * 10;
-    score += ratingScore;
-    
-    // Availability bonus (5 points for available drivers)
-    if (driver.isAvailable) {
-      score += 5;
-    }
-    
-    // Recent activity bonus (max 5 points)
-    const hoursSinceLastSeen = (Date.now() - driver.lastSeen.getTime()) / (1000 * 60 * 60);
-    const activityScore = Math.max(0, 5 * (1 - hoursSinceLastSeen / 24));
-    score += activityScore;
-    
-    // Urgent order bonus for premium drivers
-    if (urgentOrder && driver.vehicleType === 'MOTORCYCLE') {
-      score += 3;
-    }
-    
-    return Math.round(score * 100) / 100;
-  }
-
-  // Update driver location and availability
-  static updateDriverLocation(
-    driverId: number, 
-    location: Omit<DriverLocation, 'driverId'>
-  ): void {
-    this.availableDrivers.set(driverId, {
-      driverId,
-      ...location
-    });
-  }
-
-  // Remove driver from available pool
   static removeDriver(driverId: number): void {
     this.availableDrivers.delete(driverId);
   }
 
-  // Get available drivers near a location
   static getAvailableDriversNear(
     location: DeliveryLocation, 
     maxDistance: number = 15,
@@ -490,7 +421,7 @@ export class AutoAssignmentService {
     for (const driver of this.availableDrivers.values()) {
       if (!driver.isAvailable) continue;
 
-      const distance = this.calculateDistance(
+      const distance = this.calculateDistanceStatic(
         location.latitude,
         location.longitude,
         driver.latitude,
@@ -498,42 +429,33 @@ export class AutoAssignmentService {
       );
 
       if (distance <= maxDistance) {
-        const score = this.calculateDriverScore(driver, distance, location.urgentOrder);
+        const score = this.calculateDriverScoreStatic(driver, distance, location.urgentOrder);
         availableDrivers.push({ ...driver, distance, score });
       }
     }
 
-    // Sort by score (highest first) and return top drivers
     return availableDrivers
       .sort((a, b) => b.score - a.score)
       .slice(0, maxDrivers)
       .map(({ distance, score, ...driver }) => driver);
   }
 
-  // Assign best available driver to an order
-  static async assignBestDriver(
-    orderId: number, 
-    deliveryLocation: DeliveryLocation
-  ): Promise<AssignmentResult | null> {
+  static async assignBestDriver(orderId: number, deliveryLocation: DeliveryLocation): Promise<AssignmentResult | null> {
     const availableDrivers = this.getAvailableDriversNear(deliveryLocation);
-    
+
     if (availableDrivers.length === 0) {
       return null;
     }
 
     const bestDriver = availableDrivers[0];
-    const distance = this.calculateDistance(
+    const distance = this.calculateDistanceStatic(
       deliveryLocation.latitude,
       deliveryLocation.longitude,
       bestDriver.latitude,
       bestDriver.longitude
     );
 
-    const driverScore = this.calculateDriverScore(
-      bestDriver, 
-      distance, 
-      deliveryLocation.urgentOrder
-    );
+    const driverScore = this.calculateDriverScoreStatic(bestDriver, distance, deliveryLocation.urgentOrder);
 
     // Mark driver as unavailable temporarily
     const updatedDriver = { ...bestDriver, isAvailable: false };
@@ -555,23 +477,53 @@ export class AutoAssignmentService {
     };
   }
 
-  // Get driver availability status
+  private static calculateDistanceStatic(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
+  private static calculateDriverScoreStatic(driver: DriverLocation, distance: number, urgentOrder: boolean = false): number {
+    let score = 0;
+
+    const maxDistance = 50;
+    const distanceScore = Math.max(0, 10 * (1 - distance / maxDistance));
+    score += distanceScore;
+
+    const ratingScore = (driver.rating / 5) * 10;
+    score += ratingScore;
+
+    if (driver.isAvailable) {
+      score += 5;
+    }
+
+    const hoursSinceLastSeen = (Date.now() - driver.lastSeen.getTime()) / (1000 * 60 * 60);
+    const activityScore = Math.max(0, 5 * (1 - hoursSinceLastSeen / 24));
+    score += activityScore;
+
+    if (urgentOrder && driver.vehicleType === 'MOTORCYCLE') {
+      score += 3;
+    }
+
+    return Math.round(score * 100) / 100;
+  }
+
   static async getDriverAvailability(driverId: number): Promise<boolean> {
     const driver = this.availableDrivers.get(driverId);
     return driver?.isAvailable ?? false;
   }
 
-  // Get assignment statistics
-  static getAssignmentStats(): {
-    totalDrivers: number;
-    availableDrivers: number;
-    averageRating: number;
-    vehicleTypes: Record<string, number>;
-  } {
+  static getAssignmentStats() {
     const drivers = Array.from(this.availableDrivers.values());
     const availableCount = drivers.filter(d => d.isAvailable).length;
     const avgRating = drivers.reduce((sum, d) => sum + d.rating, 0) / drivers.length || 0;
-    
+
     const vehicleTypes = drivers.reduce((acc, driver) => {
       acc[driver.vehicleType] = (acc[driver.vehicleType] || 0) + 1;
       return acc;
@@ -585,7 +537,6 @@ export class AutoAssignmentService {
     };
   }
 
-  // Simulate some drivers for testing (remove in production)
   static initializeMockDrivers(): void {
     const mockDrivers: DriverLocation[] = [
       {
@@ -613,7 +564,7 @@ export class AutoAssignmentService {
         isAvailable: false,
         vehicleType: 'MOTORCYCLE',
         rating: 4.8,
-        lastSeen: new Date(Date.now() - 30 * 60 * 1000) // 30 minutes ago
+        lastSeen: new Date(Date.now() - 30 * 60 * 1000)
       }
     ];
 
@@ -625,3 +576,6 @@ export class AutoAssignmentService {
 
 // Initialize with some mock data
 AutoAssignmentService.initializeMockDrivers();
+
+export const autoAssignmentService = new AutoAssignmentService();
+export { AutoAssignmentService, AssignmentCriteria, DriverCandidate, DriverLocation, DeliveryLocation, AssignmentResult };

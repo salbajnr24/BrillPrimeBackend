@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import axios from 'axios';
 import db from '../config/database';
-import { orders, products, cartItems, users } from '../schema';
+import { orders, products, cartItems, users, transactions, reviews } from '../schema';
 import { authenticateToken, authorizeRoles } from '../utils/auth';
 import { Message } from '../utils/messages';
 import { createNotification } from './notifications';

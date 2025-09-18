@@ -1,19 +1,19 @@
 export const validateEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+  return emailRegex.test(email) && email.length <= 254;
 };
 
 export const validatePassword = (password: string): boolean => {
-  return password.length >= 6;
+  return password.length >= 6; // Minimum 6 characters
 };
 
 export const validateRole = (role: string): boolean => {
-  return ['CONSUMER', 'VENDOR', 'DRIVER', 'MERCHANT'].includes(role);
+  return ['CONSUMER', 'VENDOR', 'DRIVER', 'MERCHANT', 'ADMIN'].includes(role);
 };
 
 export const validatePhone = (phone: string): boolean => {
-  const phoneRegex = /^\+?[\d\s\-\(\)]+$/;
-  return phoneRegex.test(phone) && phone.length >= 10;
+  const phoneRegex = /^(\+234|0)[789][01]\d{8}$/; // Nigerian phone format
+  return phoneRegex.test(phone.replace(/[\s-]/g, ''));
 };
 
 export const validateSignUp = (data: any): { isValid: boolean; errors: string[] } => {
@@ -111,8 +111,8 @@ export const validateForgotPassword = (data: any): { isValid: boolean; errors: s
 export const validateAddToCart = (data: any): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
 
-  if (!data.commodityId || typeof data.commodityId !== 'string') {
-    errors.push('Valid commodity ID is required');
+  if (!data.productId || typeof data.productId !== 'string') {
+    errors.push('Valid product ID is required');
   }
 
   if (!data.quantity || typeof data.quantity !== 'number' || data.quantity < 1) {
@@ -125,8 +125,8 @@ export const validateAddToCart = (data: any): { isValid: boolean; errors: string
 export const validateRemoveFromCart = (data: any): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
 
-  if (!data.commodityId || typeof data.commodityId !== 'string') {
-    errors.push('Valid commodity ID is required');
+  if (!data.productId || typeof data.productId !== 'string') {
+    errors.push('Valid product ID is required');
   }
 
   return { isValid: errors.length === 0, errors };
@@ -134,10 +134,6 @@ export const validateRemoveFromCart = (data: any): { isValid: boolean; errors: s
 
 export const validateUpdateCartItem = (data: any): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
-
-  if (!data.cartItemId || typeof data.cartItemId !== 'string') {
-    errors.push('Valid cart item ID is required');
-  }
 
   if (!data.quantity || typeof data.quantity !== 'number' || data.quantity < 1) {
     errors.push('Quantity must be a positive number greater than 0');
@@ -149,65 +145,51 @@ export const validateUpdateCartItem = (data: any): { isValid: boolean; errors: s
 export const validateAddCommodity = (data: any): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
 
-  if (!data.name || typeof data.name !== 'string' || data.name.trim().length === 0) {
-    errors.push('Name is required and must be a valid string');
+  if (!data.name || data.name.trim().length === 0) {
+    errors.push('Product name is required');
   }
 
-  if (!data.price || typeof data.price !== 'string' || data.price.trim().length === 0) {
-    errors.push('Price is required and must be a valid string');
+  if (!data.description || data.description.trim().length === 0) {
+    errors.push('Product description is required');
   }
 
-  if (!data.description || typeof data.description !== 'string' || data.description.trim().length === 0) {
-    errors.push('Description is required and must be a valid string');
+  if (!data.price || data.price <= 0) {
+    errors.push('Valid price is required');
   }
 
-  if (!data.unit || typeof data.unit !== 'string' || data.unit.trim().length === 0) {
-    errors.push('Unit is required and must be a valid string');
+  if (!data.unit || data.unit.trim().length === 0) {
+    errors.push('Unit is required');
   }
 
-  if (!data.quantity || typeof data.quantity !== 'number' || data.quantity < 1) {
-    errors.push('Quantity must be a positive number greater than 0');
+  if (!data.quantity || data.quantity < 0) {
+    errors.push('Valid quantity is required');
   }
 
-  if (data.imageUrl && typeof data.imageUrl !== 'string') {
-    errors.push('Image URL must be a valid string if provided');
-  }
-
-  if (data.category && typeof data.category !== 'string') {
-    errors.push('Category must be a valid string if provided');
-  }
-
-  return { isValid: errors.length === 0, errors };
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
 };
 
 export const validateUpdateCommodity = (data: any): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
 
-  if (data.name !== undefined && (typeof data.name !== 'string' || data.name.trim().length === 0)) {
-    errors.push('Name must be a valid string if provided');
+  if (data.name !== undefined && data.name.trim().length === 0) {
+    errors.push('Product name cannot be empty');
   }
 
-  if (data.price !== undefined && (typeof data.price !== 'string' || data.price.trim().length === 0)) {
-    errors.push('Price must be a valid string if provided');
+  if (data.price !== undefined && data.price <= 0) {
+    errors.push('Price must be greater than 0');
   }
 
-  if (data.description !== undefined && (typeof data.description !== 'string' || data.description.trim().length === 0)) {
-    errors.push('Description must be a valid string if provided');
+  if (data.quantity !== undefined && data.quantity < 0) {
+    errors.push('Quantity cannot be negative');
   }
 
-  if (data.quantity !== undefined && (typeof data.quantity !== 'number' || data.quantity < 1)) {
-    errors.push('Quantity must be a positive number greater than 0 if provided');
-  }
-
-  if (data.imageUrl !== undefined && typeof data.imageUrl !== 'string') {
-    errors.push('Image URL must be a valid string if provided');
-  }
-
-  if (data.category !== undefined && typeof data.category !== 'string') {
-    errors.push('Category must be a valid string if provided');
-  }
-
-  return { isValid: errors.length === 0, errors };
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
 };
 
 export const validatePlaceOrder = (data: any): { isValid: boolean; errors: string[] } => {
@@ -393,69 +375,6 @@ export const validateAddBankDetails = (data: any): { isValid: boolean; errors: s
   }
 
   return { isValid: errors.length === 0, errors };
-};
-export const validateEmail = (email: string): boolean => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email) && email.length <= 254;
-};
-
-export const validatePhone = (phone: string): boolean => {
-  const phoneRegex = /^(\+234|0)[789][01]\d{8}$/; // Nigerian phone format
-  return phoneRegex.test(phone.replace(/[\s-]/g, ''));
-};
-
-export const validatePassword = (password: string): boolean => {
-  return password.length >= 6; // Minimum 6 characters
-};
-
-export const validateAddCommodity = (data: any): { isValid: boolean; errors: string[] } => {
-  const errors: string[] = [];
-  
-  if (!data.name || data.name.trim().length === 0) {
-    errors.push('Product name is required');
-  }
-  
-  if (!data.description || data.description.trim().length === 0) {
-    errors.push('Product description is required');
-  }
-  
-  if (!data.price || data.price <= 0) {
-    errors.push('Valid price is required');
-  }
-  
-  if (!data.unit || data.unit.trim().length === 0) {
-    errors.push('Unit is required');
-  }
-  
-  if (!data.quantity || data.quantity < 0) {
-    errors.push('Valid quantity is required');
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors
-  };
-};
-
-export const validateUpdateCommodity = (data: any): { isValid: boolean; errors: string[] } => {
-  const errors: string[] = [];
-  
-  if (data.name !== undefined && data.name.trim().length === 0) {
-    errors.push('Product name cannot be empty');
-  }
-  
-  if (data.price !== undefined && data.price <= 0) {
-    errors.push('Price must be greater than 0');
-  }
-  
-  if (data.quantity !== undefined && data.quantity < 0) {
-    errors.push('Quantity cannot be negative');
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors
-  };
 };
 
 export const sanitizeInput = (input: string): string => {

@@ -2,7 +2,8 @@ import { pgTable, text, serial, integer, boolean, timestamp, decimal, uuid, json
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
-import { sql } from "drizzle-orm";
+import { sql, eq, and, desc, ne, isNull, or } from 'drizzle-orm';
+import { transactions } from './index';
 
 // Define an enum for user roles if it's not defined elsewhere
 const roleEnum = pgEnum("role", ["CONSUMER", "MERCHANT", "DRIVER", "ADMIN"]);

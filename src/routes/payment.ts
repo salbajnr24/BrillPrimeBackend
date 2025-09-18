@@ -2,7 +2,7 @@ import { Router } from 'express';
 import axios from 'axios';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import db from '../config/database';
-import { users, orders, products, driverProfiles, deliveryRequests } from '../schema';
+import { users, orders, products, driverProfiles, deliveryRequests, transactions } from '../schema';
 import { authenticateToken, authorizeRoles } from '../utils/auth';
 import { createNotification } from './notifications';
 import { fraudDetectionMiddleware, logPaymentMismatch } from '../utils/fraud-middleware';
