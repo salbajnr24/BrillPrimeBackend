@@ -42,9 +42,9 @@ export const otpCodes = pgTable("otp_codes", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const userLocations = pgTable("user_locations", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id),
+export const userLocations = pgTable('user_locations', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id).notNull(),
   latitude: decimal("latitude", { precision: 10, scale: 8 }).notNull(),
   longitude: decimal("longitude", { precision: 11, scale: 8 }).notNull(),
   address: text("address"),
@@ -104,13 +104,11 @@ export const openingHours = pgTable('opening_hours', {
 
 // Search functionality tables
 export const searchHistory = pgTable('search_history', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: integer('user_id').references(() => users.id),
-  searchTerm: varchar('search_term', { length: 255 }).notNull(),
-  filters: json('filters'),
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id).notNull(),
+  searchQuery: varchar('search_query', { length: 255 }).notNull(),
+  searchType: varchar('search_type', { length: 50 }).default('GENERAL'),
   resultsCount: integer('results_count').default(0),
-  isSaved: boolean('is_saved').default(false),
-  savedName: varchar('saved_name', { length: 100 }),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -124,18 +122,13 @@ export const trendingSearches = pgTable('trending_searches', {
 
 // Reviews functionality tables
 export const reviews = pgTable('reviews', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: serial('id').primaryKey(),
   userId: integer('user_id').references(() => users.id).notNull(),
-  productId: uuid('product_id').references(() => products.id).notNull(),
-  orderId: uuid('order_id').references(() => orders.id),
+  targetType: varchar('target_type', { length: 20 }).notNull(), // PRODUCT, MERCHANT, DRIVER
+  targetId: integer('target_id').notNull(),
+  orderId: integer('order_id').references(() => orders.id),
   rating: integer('rating').notNull(),
   comment: text('comment'),
-  isApproved: boolean('is_approved').default(true),
-  isRejected: boolean('is_rejected').default(false),
-  isFlagged: boolean('is_flagged').default(false),
-  rejectionReason: text('rejection_reason'),
-  flagReason: text('flag_reason'),
-  moderatedAt: timestamp('moderated_at'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
@@ -440,21 +433,22 @@ export const ratings = pgTable('ratings', {
 
 // Additional missing tables for advanced features
 export const transactions = pgTable('transactions', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: integer('user_id').notNull().references(() => users.id),
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id).notNull(),
   recipientId: integer('recipient_id').references(() => users.id),
-  orderId: uuid('order_id').references(() => orders.id),
-  type: varchar('type', { length: 50 }).notNull(),
-  status: varchar('status', { length: 50 }).default('PENDING'),
+  type: varchar('type', { length: 50 }).notNull(), // PAYMENT, REFUND, PAYOUT, DISPUTE, etc.
   amount: varchar('amount', { length: 20 }).notNull(),
   fee: varchar('fee', { length: 20 }).default('0.00'),
   netAmount: varchar('net_amount', { length: 20 }).notNull(),
-  currency: varchar('currency', { length: 10 }).default('NGN'),
+  currency: varchar('currency', { length: 3 }).default('NGN'),
+  status: varchar('status', { length: 20 }).default('PENDING'),
+  description: text('description'),
   paymentMethod: varchar('payment_method', { length: 50 }),
   transactionRef: varchar('transaction_ref', { length: 255 }),
-  description: text('description'),
+  relatedOrderId: integer('related_order_id').references(() => orders.id),
+  relatedTransactionId: integer('related_transaction_id'),
+  processedBy: integer('processed_by').references(() => users.id),
   metadata: json('metadata'),
-  initiatedAt: timestamp('initiated_at').defaultNow(),
   completedAt: timestamp('completed_at'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),

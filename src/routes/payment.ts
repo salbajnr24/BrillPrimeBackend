@@ -885,4 +885,209 @@ router.post('/api/report/product/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// Process payment refund
+router.post('/refund/:id', authenticateToken, authorizeRoles('MERCHANT', 'ADMIN'), async (req: any, res) => {
+  try {
+    const { id: transactionId } = req.params;
+    const { amount, reason } = req.body;
+    const userId = req.user?.userId;
+
+    if (!amount || !reason) {
+      return res.status(400).json({ error: 'Amount and reason are required' });
+    }
+
+    // Find the original transaction
+    const originalTransaction = await db.select().from(transactions).where(eq(transactions.id, transactionId));
+    
+    if (originalTransaction.length === 0) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    const transaction = originalTransaction[0];
+    
+    // Verify user has permission to refund
+    if (req.user.role !== 'ADMIN') {
+      // Check if user is the merchant for this transaction
+      const order = await db.select().from(orders).where(eq(orders.id, transaction.relatedOrderId));
+      if (order.length === 0 || order[0].sellerId !== userId) {
+        return res.status(403).json({ error: 'Not authorized to refund this transaction' });
+      }
+    }
+
+    // Create refund transaction
+    const refund = await db.insert(transactions).values({
+      userId: transaction.userId,
+      type: 'REFUND',
+      amount: amount.toString(),
+      status: 'COMPLETED',
+      description: `Refund for transaction ${transactionId}: ${reason}`,
+      relatedTransactionId: transactionId,
+      processedBy: userId,
+      createdAt: new Date()
+    }).returning();
+
+    res.json({
+      status: 'Success',
+      message: 'Refund processed successfully',
+      data: refund[0]
+    });
+  } catch (error) {
+    console.error('Process refund error:', error);
+    res.status(500).json({ error: 'Failed to process refund' });
+  }
+});
+
+// Create payment dispute
+router.post('/dispute/:id', authenticateToken, async (req: any, res) => {
+  try {
+    const { id: transactionId } = req.params;
+    const { reason, description, evidence = [] } = req.body;
+    const userId = req.user?.userId;
+
+    if (!reason || !description) {
+      return res.status(400).json({ error: 'Reason and description are required' });
+    }
+
+    // Find the transaction
+    const transaction = await db.select().from(transactions).where(eq(transactions.id, transactionId));
+    
+    if (transaction.length === 0) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    // Verify user owns this transaction
+    if (transaction[0].userId !== userId) {
+      return res.status(403).json({ error: 'Not authorized to dispute this transaction' });
+    }
+
+    // Create dispute record
+    const dispute = await db.insert(transactions).values({
+      userId,
+      type: 'DISPUTE',
+      amount: '0.00',
+      status: 'PENDING',
+      description: `Dispute for transaction ${transactionId}: ${reason} - ${description}`,
+      relatedTransactionId: transactionId,
+      metadata: { reason, description, evidence },
+      createdAt: new Date()
+    }).returning();
+
+    res.status(201).json({
+      status: 'Success',
+      message: 'Payment dispute created successfully',
+      data: dispute[0]
+    });
+  } catch (error) {
+    console.error('Create dispute error:', error);
+    res.status(500).json({ error: 'Failed to create dispute' });
+  }
+});
+
+// Request payout
+router.post('/payout', authenticateToken, authorizeRoles('MERCHANT', 'DRIVER'), async (req: any, res) => {
+  try {
+    const { amount, bankAccount } = req.body;
+    const userId = req.user?.userId;
+
+    if (!amount || !bankAccount) {
+      return res.status(400).json({ error: 'Amount and bank account are required' });
+    }
+
+    // Create payout request
+    const payout = await db.insert(transactions).values({
+      userId,
+      type: 'PAYOUT_REQUEST',
+      amount: amount.toString(),
+      status: 'PENDING',
+      description: `Payout request for ${amount}`,
+      metadata: { bankAccount },
+      createdAt: new Date()
+    }).returning();
+
+    res.status(201).json({
+      status: 'Success',
+      message: 'Payout request submitted successfully',
+      data: payout[0]
+    });
+  } catch (error) {
+    console.error('Request payout error:', error);
+    res.status(500).json({ error: 'Failed to request payout' });
+  }
+});
+
+// Get payout history
+router.get('/payout/history', authenticateToken, authorizeRoles('MERCHANT', 'DRIVER'), async (req: any, res) => {
+  try {
+    const userId = req.user?.userId;
+    const { page = 1, limit = 20 } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
+
+    const payoutHistory = await db.select()
+      .from(transactions)
+      .where(and(
+        eq(transactions.userId, userId),
+        or(
+          eq(transactions.type, 'PAYOUT_REQUEST'),
+          eq(transactions.type, 'PAYOUT_COMPLETED')
+        )
+      ))
+      .orderBy(desc(transactions.createdAt))
+      .limit(Number(limit))
+      .offset(offset);
+
+    res.json({
+      status: 'Success',
+      message: 'Payout history retrieved successfully',
+      data: {
+        payouts: payoutHistory,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total: payoutHistory.length
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get payout history error:', error);
+    res.status(500).json({ error: 'Failed to get payout history' });
+  }
+});
+
+// Get payment history
+router.get('/history', authenticateToken, async (req: any, res) => {
+  try {
+    const userId = req.user?.userId;
+    const { page = 1, limit = 20, type } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
+
+    let whereConditions = [eq(transactions.userId, userId)];
+    if (type) {
+      whereConditions.push(eq(transactions.type, type));
+    }
+
+    const paymentHistory = await db.select()
+      .from(transactions)
+      .where(and(...whereConditions))
+      .orderBy(desc(transactions.createdAt))
+      .limit(Number(limit))
+      .offset(offset);
+
+    res.json({
+      status: 'Success',
+      message: 'Payment history retrieved successfully',
+      data: {
+        transactions: paymentHistory,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total: paymentHistory.length
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get payment history error:', error);
+    res.status(500).json({ error: 'Failed to get payment history' });
+  }
+});
+
 export default router;

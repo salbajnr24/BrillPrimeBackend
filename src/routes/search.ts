@@ -696,3 +696,368 @@ router.delete('/saved/:id', authenticateToken, async (req, res) => {
 });
 
 export default router;
+<line_number>1</line_number>
+import { Router } from 'express';
+import { eq, and, like, sql, desc, asc, count, or } from 'drizzle-orm';
+import db from '../config/database';
+import { products, categories, users, merchantProfiles, searchHistory, trendingSearches } from '../schema';
+import { authenticateToken } from '../utils/auth';
+import { Message } from '../utils/messages';
+
+const router = Router();
+
+// Search merchants
+router.get('/merchants', async (req, res) => {
+  try {
+    const { q = '', location, category, page = 1, limit = 20 } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
+
+    let whereConditions = [eq(users.role, 'MERCHANT'), eq(users.isVerified, true)];
+
+    if (q) {
+      whereConditions.push(
+        or(
+          like(users.fullName, `%${q}%`),
+          like(merchantProfiles.businessName, `%${q}%`),
+          like(merchantProfiles.businessDescription, `%${q}%`)
+        )
+      );
+    }
+
+    if (location) {
+      whereConditions.push(
+        or(
+          like(users.city, `%${location}%`),
+          like(users.state, `%${location}%`),
+          like(merchantProfiles.businessAddress, `%${location}%`)
+        )
+      );
+    }
+
+    if (category) {
+      whereConditions.push(eq(merchantProfiles.businessType, category as string));
+    }
+
+    const merchants = await db.select({
+      id: users.id,
+      fullName: users.fullName,
+      profilePicture: users.profilePicture,
+      city: users.city,
+      state: users.state,
+      businessName: merchantProfiles.businessName,
+      businessType: merchantProfiles.businessType,
+      businessDescription: merchantProfiles.businessDescription,
+      businessLogo: merchantProfiles.businessLogo,
+      rating: merchantProfiles.rating,
+      reviewCount: merchantProfiles.reviewCount,
+      isVerified: merchantProfiles.isVerified,
+    })
+      .from(users)
+      .leftJoin(merchantProfiles, eq(users.id, merchantProfiles.userId))
+      .where(and(...whereConditions))
+      .limit(Number(limit))
+      .offset(offset);
+
+    res.json({
+      status: 'Success',
+      message: 'Merchants found successfully',
+      data: {
+        merchants,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total: merchants.length,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Search merchants error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get trending searches
+router.get('/trending', async (req, res) => {
+  try {
+    const { limit = 10 } = req.query;
+
+    const trending = await db.select()
+      .from(trendingSearches)
+      .orderBy(desc(trendingSearches.searchCount))
+      .limit(Number(limit));
+
+    res.json({
+      status: 'Success',
+      message: 'Trending searches retrieved successfully',
+      data: trending,
+    });
+  } catch (error) {
+    console.error('Get trending searches error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Save search query
+router.post('/save', authenticateToken, async (req, res) => {
+  try {
+    const userId = (req as any).user.userId;
+    const { query } = req.body;
+
+    if (!query) {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+
+    // Save to search history
+    await db.insert(searchHistory).values({
+      userId,
+      searchQuery: query,
+      searchType: 'GENERAL',
+    });
+
+    // Update trending searches
+    const existing = await db.select()
+      .from(trendingSearches)
+      .where(eq(trendingSearches.searchTerm, query));
+
+    if (existing.length > 0) {
+      await db.update(trendingSearches)
+        .set({ searchCount: existing[0].searchCount + 1 })
+        .where(eq(trendingSearches.id, existing[0].id));
+    } else {
+      await db.insert(trendingSearches).values({
+        searchTerm: query,
+        searchCount: 1,
+      });
+    }
+
+    res.json({
+      status: 'Success',
+      message: 'Search query saved successfully',
+    });
+  } catch (error) {
+    console.error('Save search error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get search history
+router.get('/history', authenticateToken, async (req, res) => {
+  try {
+    const userId = (req as any).user.userId;
+    const { page = 1, limit = 20 } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
+
+    const history = await db.select()
+      .from(searchHistory)
+      .where(eq(searchHistory.userId, userId))
+      .orderBy(desc(searchHistory.createdAt))
+      .limit(Number(limit))
+      .offset(offset);
+
+    res.json({
+      status: 'Success',
+      message: 'Search history retrieved successfully',
+      data: {
+        history,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total: history.length,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Get search history error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get search suggestions
+router.get('/suggestions', async (req, res) => {
+  try {
+    const { q } = req.query;
+
+    if (!q) {
+      return res.json({
+        status: 'Success',
+        data: { suggestions: [] },
+      });
+    }
+
+    // Get product suggestions
+    const productSuggestions = await db.select({
+      id: products.id,
+      name: products.name,
+      type: sql<string>`'product'`,
+    })
+      .from(products)
+      .where(and(
+        like(products.name, `%${q}%`),
+        eq(products.isActive, true)
+      ))
+      .limit(5);
+
+    // Get category suggestions
+    const categorySuggestions = await db.select({
+      id: categories.id,
+      name: categories.name,
+      type: sql<string>`'category'`,
+    })
+      .from(categories)
+      .where(like(categories.name, `%${q}%`))
+      .limit(3);
+
+    const suggestions = [...productSuggestions, ...categorySuggestions];
+
+    res.json({
+      status: 'Success',
+      message: 'Search suggestions retrieved successfully',
+      data: { suggestions },
+    });
+  } catch (error) {
+    console.error('Get search suggestions error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Advanced product search (already exists but ensure it has all expected query params)
+router.get('/products', async (req, res) => {
+  try {
+    const {
+      q = '',
+      category,
+      minPrice,
+      maxPrice,
+      rating,
+      location,
+      latitude,
+      longitude,
+      radius = 10,
+      sortBy = 'relevance',
+      sortOrder = 'desc',
+      page = 1,
+      limit = 20,
+      inStock,
+      merchantId
+    } = req.query;
+
+    const offset = (Number(page) - 1) * Number(limit);
+    let whereConditions = [eq(products.isActive, true)];
+
+    // Text search
+    if (q) {
+      whereConditions.push(
+        sql`(${products.name} ILIKE ${`%${q}%`} OR ${products.description} ILIKE ${`%${q}%`})`
+      );
+    }
+
+    // Category filter
+    if (category) {
+      whereConditions.push(eq(products.categoryId, Number(category)));
+    }
+
+    // Price range filter
+    if (minPrice) {
+      whereConditions.push(sql`CAST(${products.price} AS DECIMAL) >= ${Number(minPrice)}`);
+    }
+    if (maxPrice) {
+      whereConditions.push(sql`CAST(${products.price} AS DECIMAL) <= ${Number(maxPrice)}`);
+    }
+
+    // Rating filter
+    if (rating) {
+      whereConditions.push(sql`CAST(${products.rating} AS DECIMAL) >= ${Number(rating)}`);
+    }
+
+    // Stock filter
+    if (inStock !== undefined) {
+      whereConditions.push(eq(products.inStock, inStock === 'true'));
+    }
+
+    // Merchant filter
+    if (merchantId) {
+      whereConditions.push(eq(products.sellerId, Number(merchantId)));
+    }
+
+    let selectQuery = db.select({
+      id: products.id,
+      name: products.name,
+      description: products.description,
+      price: products.price,
+      unit: products.unit,
+      image: products.image,
+      rating: products.rating,
+      reviewCount: products.reviewCount,
+      inStock: products.inStock,
+      minimumOrder: products.minimumOrder,
+      createdAt: products.createdAt,
+      category: {
+        id: categories.id,
+        name: categories.name,
+        icon: categories.icon,
+        slug: categories.slug,
+      },
+      seller: {
+        id: users.id,
+        userId: users.userId,
+        fullName: users.fullName,
+        profilePicture: users.profilePicture,
+        city: users.city,
+        state: users.state,
+      },
+      merchant: {
+        businessName: merchantProfiles.businessName,
+        businessAddress: merchantProfiles.businessAddress,
+        rating: merchantProfiles.rating,
+      },
+    })
+      .from(products)
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .leftJoin(users, eq(products.sellerId, users.id))
+      .leftJoin(merchantProfiles, eq(users.id, merchantProfiles.userId))
+      .where(and(...whereConditions));
+
+    // Sorting
+    switch (sortBy) {
+      case 'price':
+        selectQuery = (selectQuery as any).orderBy(
+          sortOrder === 'asc' ? asc(sql`CAST(${products.price} AS DECIMAL)`) : desc(sql`CAST(${products.price} AS DECIMAL)`)
+        );
+        break;
+      case 'rating':
+        selectQuery = (selectQuery as any).orderBy(
+          sortOrder === 'asc' ? asc(sql`CAST(${products.rating} AS DECIMAL)`) : desc(sql`CAST(${products.rating} AS DECIMAL)`)
+        );
+        break;
+      case 'newest':
+        selectQuery = (selectQuery as any).orderBy(desc(products.createdAt));
+        break;
+      default:
+        selectQuery = (selectQuery as any).orderBy(desc(products.createdAt));
+    }
+
+    const searchResults = await selectQuery
+      .limit(Number(limit))
+      .offset(offset);
+
+    res.json({
+      status: 'Success',
+      message: 'Search completed successfully',
+      data: {
+        products: searchResults,
+        searchQuery: q,
+        filters: { category, minPrice, maxPrice, rating, inStock, merchantId },
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total: searchResults.length,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Product search error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+export default router;

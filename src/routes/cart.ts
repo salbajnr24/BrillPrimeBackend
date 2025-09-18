@@ -107,6 +107,65 @@ router.post('/add', authenticateToken, async (req, res) => {
   }
 });
 
+// Alternative add endpoint for frontend compatibility
+router.post('/', authenticateToken, async (req, res) => {
+  try {
+    const userId = (req as any).user.userId;
+    const { productId, quantity = 1 } = req.body;
+
+    if (!productId) {
+      return res.status(400).json({ error: 'Product ID is required' });
+    }
+
+    // Check if product exists and is active
+    const product = await db.select().from(products).where(and(
+      eq(products.id, productId),
+      eq(products.isActive, true),
+      eq(products.inStock, true)
+    ));
+
+    if (product.length === 0) {
+      return res.status(404).json({ error: 'Product not found or out of stock' });
+    }
+
+    // Check if item already exists in cart
+    const existingItem = await db.select().from(cartItems).where(and(
+      eq(cartItems.userId, userId),
+      eq(cartItems.productId, productId)
+    ));
+
+    if (existingItem.length > 0) {
+      // Update quantity
+      const updatedItem = await db.update(cartItems)
+        .set({ quantity: existingItem[0].quantity + quantity })
+        .where(eq(cartItems.id, existingItem[0].id))
+        .returning();
+
+      res.json({
+        status: 'Success',
+        message: 'Cart item updated successfully',
+        data: updatedItem[0],
+      });
+    } else {
+      // Add new item
+      const newItem = await db.insert(cartItems).values({
+        userId,
+        productId,
+        quantity,
+      }).returning();
+
+      res.status(201).json({
+        status: 'Success',
+        message: 'Item added to cart successfully',
+        data: newItem[0],
+      });
+    }
+  } catch (error) {
+    console.error('Add to cart error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Update cart item quantity
 router.put('/:id', authenticateToken, async (req, res) => {
   try {

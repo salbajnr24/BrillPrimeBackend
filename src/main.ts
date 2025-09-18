@@ -56,6 +56,7 @@ import reviewsRoutes from './routes/reviews';
 import geoRoutes from './routes/geo';
 import driverManagementRoutes from './routes/driver-management';
 import autoAssignmentRoutes from './routes/auto-assignment';
+import searchRoutes from './routes/search';
 
 const app = express();
 const server = createServer(app);
@@ -155,6 +156,7 @@ app.use('/api/reviews', reviewsRoutes);
 app.use('/api/geo', geoRoutes);
 app.use('/api/drivers', driverManagementRoutes);
 app.use('/api/auto-assignment', autoAssignmentRoutes);
+app.use('/api/search', searchRoutes);
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
