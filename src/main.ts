@@ -7,6 +7,13 @@ import { PORT } from './config/environment';
 import { testDatabaseConnection } from './utils/db-test';
 import { initializeWebSocket } from './utils/websocket';
 import { realtimeHeaders, performanceTracker } from './utils/realtime-middleware';
+import morgan from 'morgan';
+import { SecurityMiddleware } from './middleware/security';
+import { cacheMiddleware } from './middleware/cacheMiddleware';
+import { rateLimiter } from './middleware/rateLimiter';
+import { ValidationMiddleware } from './middleware/validation';
+import { realtimeAnalyticsService } from './services/realtimeAnalytics';
+import { messageQueue } from './services/messageQueue';
 
 // Route imports
 import authRoutes from './routes/auth';
@@ -53,16 +60,33 @@ const app = express();
 const server = createServer(app);
 const serverPort = PORT || 3000;
 
-// Middleware
-app.use(helmet());
-app.use(cors({
-  origin: '*',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+// Security middleware
+const securityMiddlewares = SecurityMiddleware.create({
+  enableHelmet: true,
+  enableRateLimit: true
+});
+securityMiddlewares.forEach(middleware => app.use(middleware));
+
+// Rate limiting
+app.use('/api/', rateLimiter.middleware({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  maxRequests: 100,
+  message: 'Too many requests from this IP'
 }));
+
+// Stricter rate limiting for auth endpoints
+app.use('/api/auth/', rateLimiter.middleware({
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 5,
+  message: 'Too many authentication attempts'
+}));
+
+// Basic middleware
+app.use(cors());
+app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(ValidationMiddleware.sanitizeHtml);
 
 // Passport middleware
 app.use(passport.initialize());
