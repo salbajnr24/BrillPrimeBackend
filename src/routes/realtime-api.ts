@@ -1,4 +1,3 @@
-
 import { Router } from 'express';
 import { authenticateToken } from '../utils/auth';
 import { RealTimeApiService } from '../utils/realtime-api';
@@ -36,7 +35,7 @@ router.get('/users/:id', authenticateToken, async (req, res) => {
 router.get('/users/role/:role', authenticateToken, async (req, res) => {
   const { role } = req.params;
   const limit = parseInt(req.query.limit as string) || 50;
-  
+
   const result = await RealTimeApiService.getUsersByRole(role, limit);
   res.status(result.success ? 200 : 500).json(result);
 });
@@ -44,7 +43,7 @@ router.get('/users/role/:role', authenticateToken, async (req, res) => {
 // Product operations
 router.get('/products/active', async (req, res) => {
   const limit = parseInt(req.query.limit as string) || 100;
-  
+
   const result = await RealTimeApiService.getActiveProducts(limit);
   res.status(result.success ? 200 : 500).json(result);
 });
@@ -77,7 +76,7 @@ router.get('/orders/user/:userId', authenticateToken, async (req, res) => {
   }
 
   const limit = parseInt(req.query.limit as string) || 50;
-  
+
   const result = await RealTimeApiService.getOrdersByUser(userId, limit);
   res.status(result.success ? 200 : 500).json(result);
 });
@@ -85,7 +84,7 @@ router.get('/orders/user/:userId', authenticateToken, async (req, res) => {
 router.get('/orders/status/:status', authenticateToken, async (req, res) => {
   const { status } = req.params;
   const limit = parseInt(req.query.limit as string) || 100;
-  
+
   const result = await RealTimeApiService.getOrdersByStatus(status, limit);
   res.status(result.success ? 200 : 500).json(result);
 });
@@ -103,7 +102,7 @@ router.get('/activity/user/:userId', authenticateToken, async (req, res) => {
   }
 
   const hours = parseInt(req.query.hours as string) || 24;
-  
+
   const result = await RealTimeApiService.getUserRecentActivity(userId, hours);
   res.status(result.success ? 200 : 500).json(result);
 });
@@ -111,7 +110,7 @@ router.get('/activity/user/:userId', authenticateToken, async (req, res) => {
 // Security monitoring
 router.get('/security/fraud-alerts', authenticateToken, async (req, res) => {
   const limit = parseInt(req.query.limit as string) || 100;
-  
+
   const result = await RealTimeApiService.getActiveFraudAlerts(limit);
   res.status(result.success ? 200 : 500).json(result);
 });

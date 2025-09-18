@@ -10,10 +10,11 @@ const client = postgres(connectionString, {
   max: 10, // Maximum number of connections in the pool
   idle_timeout: 20,
   connect_timeout: 10,
-  ssl: process.env.NODE_ENV === 'production' || connectionString.includes('supabase.com') || connectionString.includes('sslmode=require') 
+  ssl: process.env.NODE_ENV === 'production' || connectionString.includes('supabase.com') || connectionString.includes('sslmode=require') || connectionString.includes('postgres://') 
     ? { rejectUnauthorized: false } 
     : false,
   onnotice: () => {}, // Disable notices
+  transform: postgres.camel,
 });
 
 export const db = drizzle(client, { schema });
