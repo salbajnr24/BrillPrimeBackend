@@ -394,3 +394,82 @@ export const validateAddBankDetails = (data: any): { isValid: boolean; errors: s
 
   return { isValid: errors.length === 0, errors };
 };
+export const validateEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email) && email.length <= 254;
+};
+
+export const validatePhone = (phone: string): boolean => {
+  const phoneRegex = /^(\+234|0)[789][01]\d{8}$/; // Nigerian phone format
+  return phoneRegex.test(phone.replace(/[\s-]/g, ''));
+};
+
+export const validatePassword = (password: string): boolean => {
+  return password.length >= 6; // Minimum 6 characters
+};
+
+export const validateAddCommodity = (data: any): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+  
+  if (!data.name || data.name.trim().length === 0) {
+    errors.push('Product name is required');
+  }
+  
+  if (!data.description || data.description.trim().length === 0) {
+    errors.push('Product description is required');
+  }
+  
+  if (!data.price || data.price <= 0) {
+    errors.push('Valid price is required');
+  }
+  
+  if (!data.unit || data.unit.trim().length === 0) {
+    errors.push('Unit is required');
+  }
+  
+  if (!data.quantity || data.quantity < 0) {
+    errors.push('Valid quantity is required');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};
+
+export const validateUpdateCommodity = (data: any): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+  
+  if (data.name !== undefined && data.name.trim().length === 0) {
+    errors.push('Product name cannot be empty');
+  }
+  
+  if (data.price !== undefined && data.price <= 0) {
+    errors.push('Price must be greater than 0');
+  }
+  
+  if (data.quantity !== undefined && data.quantity < 0) {
+    errors.push('Quantity cannot be negative');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};
+
+export const sanitizeInput = (input: string): string => {
+  return input.trim().replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+};
+
+export const validateImageUrl = (url: string): boolean => {
+  const urlRegex = /^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)$/i;
+  return urlRegex.test(url);
+};
+
+export const validatePriceRange = (minPrice?: number, maxPrice?: number): boolean => {
+  if (minPrice !== undefined && maxPrice !== undefined) {
+    return minPrice <= maxPrice && minPrice >= 0;
+  }
+  return true;
+};

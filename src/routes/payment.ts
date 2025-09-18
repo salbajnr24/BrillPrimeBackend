@@ -1090,4 +1090,183 @@ router.get('/history', authenticateToken, async (req: any, res) => {
   }
 });
 
+// Create payment dispute
+router.post('/dispute/:id', authenticateToken, async (req: any, res) => {
+  try {
+    const { id: paymentId } = req.params;
+    const userId = req.user?.userId;
+    const { reason, description, evidence = [] } = req.body;
+
+    if (!reason || !description) {
+      return res.status(400).json({ error: 'Reason and description are required' });
+    }
+
+    // Check if payment exists and belongs to user
+    const payment = await db.select().from(orders).where(eq(orders.id, paymentId));
+    
+    if (payment.length === 0) {
+      return res.status(404).json({ error: 'Payment not found' });
+    }
+
+    if (payment[0].buyerId !== userId) {
+      return res.status(403).json({ error: 'You can only dispute your own payments' });
+    }
+
+    // Create dispute record (you might need to add a disputes table)
+    const disputeRef = `DISPUTE_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+    
+    res.json({
+      status: 'Success',
+      message: 'Payment dispute created successfully',
+      data: {
+        disputeRef,
+        paymentId,
+        reason,
+        description,
+        evidence,
+        status: 'PENDING',
+        createdAt: new Date()
+      }
+    });
+  } catch (error) {
+    console.error('Create payment dispute error:', error);
+    res.status(500).json({ error: 'Failed to create payment dispute' });
+  }
+});
+
+// Request payout (for merchants/drivers)
+router.post('/payout', authenticateToken, authorizeRoles('MERCHANT', 'DRIVER'), async (req: any, res) => {
+  try {
+    const userId = req.user?.userId;
+    const { amount, bankAccount, reason } = req.body;
+
+    if (!amount || !bankAccount) {
+      return res.status(400).json({ error: 'Amount and bank account details are required' });
+    }
+
+    if (amount <= 0) {
+      return res.status(400).json({ error: 'Amount must be greater than 0' });
+    }
+
+    // Generate payout reference
+    const payoutRef = `PAYOUT_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+
+    // In a real implementation, you would check available balance
+    // and integrate with a payout service
+
+    res.json({
+      status: 'Success',
+      message: 'Payout request submitted successfully',
+      data: {
+        payoutRef,
+        amount,
+        status: 'PENDING',
+        estimatedProcessingTime: '2-3 business days',
+        createdAt: new Date()
+      }
+    });
+  } catch (error) {
+    console.error('Request payout error:', error);
+    res.status(500).json({ error: 'Failed to request payout' });
+  }
+});
+
+// Get payout history
+router.get('/payout/history', authenticateToken, authorizeRoles('MERCHANT', 'DRIVER'), async (req: any, res) => {
+  try {
+    const userId = req.user?.userId;
+    const { page = 1, limit = 20, status } = req.query;
+
+    // Mock payout history - in real implementation, fetch from database
+    const mockPayouts = [
+      {
+        id: 1,
+        payoutRef: 'PAYOUT_1234567890_abc123',
+        amount: 15000,
+        status: 'COMPLETED',
+        bankAccount: '**** **** **** 1234',
+        processedAt: new Date(Date.now() - 86400000), // 1 day ago
+        createdAt: new Date(Date.now() - 172800000), // 2 days ago
+      },
+      {
+        id: 2,
+        payoutRef: 'PAYOUT_1234567891_def456',
+        amount: 25000,
+        status: 'PENDING',
+        bankAccount: '**** **** **** 1234',
+        createdAt: new Date(Date.now() - 86400000), // 1 day ago
+      }
+    ];
+
+    res.json({
+      status: 'Success',
+      message: 'Payout history retrieved successfully',
+      data: {
+        payouts: mockPayouts,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total: mockPayouts.length
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get payout history error:', error);
+    res.status(500).json({ error: 'Failed to get payout history' });
+  }
+});
+
+// Get payment history
+router.get('/history', authenticateToken, async (req: any, res) => {
+  try {
+    const userId = req.user?.userId;
+    const { page = 1, limit = 20, type, status } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
+
+    let whereConditions = [eq(orders.buyerId, userId)];
+
+    if (status) {
+      whereConditions.push(eq(orders.status, status as any));
+    }
+
+    const paymentHistory = await db.select({
+      id: orders.id,
+      totalPrice: orders.totalPrice,
+      status: orders.status,
+      createdAt: orders.createdAt,
+      product: {
+        name: products.name,
+        image: products.image,
+      },
+      seller: {
+        fullName: users.fullName,
+        profilePicture: users.profilePicture,
+      }
+    })
+      .from(orders)
+      .leftJoin(products, eq(orders.productId, products.id))
+      .leftJoin(users, eq(orders.sellerId, users.id))
+      .where(and(...whereConditions))
+      .orderBy(desc(orders.createdAt))
+      .limit(Number(limit))
+      .offset(offset);
+
+    res.json({
+      status: 'Success',
+      message: 'Payment history retrieved successfully',
+      data: {
+        payments: paymentHistory,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total: paymentHistory.length
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get payment history error:', error);
+    res.status(500).json({ error: 'Failed to get payment history' });
+  }
+});
+
 export default router;

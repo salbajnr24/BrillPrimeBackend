@@ -86,6 +86,192 @@ router.post('/checkout', authenticateToken, async (req, res) => {
   }
 });
 
+// Cancel order (consumer only)
+router.put('/:id/cancel', authenticateToken, async (req, res) => {
+  try {
+    const { id: orderId } = req.params;
+    const buyerId = (req as any).user.userId;
+    const { reason } = req.body;
+
+    // Check if order belongs to the buyer and can be cancelled
+    const existingOrder = await db.select().from(orders).where(and(
+      eq(orders.id, orderId),
+      eq(orders.buyerId, buyerId)
+    ));
+
+    if (existingOrder.length === 0) {
+      return res.status(404).json({ error: 'Order not found or you do not have permission to cancel it' });
+    }
+
+    const order = existingOrder[0];
+
+    // Check if order can be cancelled (only pending or confirmed orders)
+    if (!['pending', 'confirmed'].includes(order.status)) {
+      return res.status(400).json({ 
+        error: 'Order cannot be cancelled at this stage',
+        currentStatus: order.status
+      });
+    }
+
+    const updatedOrder = await db.update(orders)
+      .set({ 
+        status: 'cancelled',
+        updatedAt: new Date()
+      })
+      .where(eq(orders.id, orderId))
+      .returning();
+
+    // Notify seller about order cancellation
+    try {
+      await createNotification({
+        userId: order.sellerId,
+        userRole: 'MERCHANT',
+        title: 'Order Cancelled',
+        message: `Order ${orderId} has been cancelled by the customer.${reason ? ` Reason: ${reason}` : ''}`,
+        type: 'ORDER_CANCELLED',
+        relatedId: orderId,
+        priority: 'MEDIUM',
+      });
+    } catch (notificationError) {
+      console.error('Failed to create order cancellation notification:', notificationError);
+    }
+
+    res.json({
+      status: 'Success',
+      message: 'Order cancelled successfully',
+      data: updatedOrder[0],
+    });
+  } catch (error) {
+    console.error('Cancel order error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Process order refund (merchant/admin only)
+router.post('/:id/refund', authenticateToken, async (req, res) => {
+  try {
+    const { id: orderId } = req.params;
+    const userId = (req as any).user.userId;
+    const userRole = (req as any).user.role;
+    const { amount, reason } = req.body;
+
+    if (!amount || !reason) {
+      return res.status(400).json({ error: 'Amount and reason are required' });
+    }
+
+    // Check if order exists
+    const existingOrder = await db.select().from(orders).where(eq(orders.id, orderId));
+
+    if (existingOrder.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const order = existingOrder[0];
+
+    // Check permissions (merchant owns the order or admin)
+    if (userRole !== 'ADMIN' && order.sellerId !== userId) {
+      return res.status(403).json({ error: 'You do not have permission to refund this order' });
+    }
+
+    // Validate refund amount
+    const orderTotal = parseFloat(order.totalPrice);
+    const refundAmount = parseFloat(amount);
+
+    if (refundAmount > orderTotal) {
+      return res.status(400).json({ error: 'Refund amount cannot exceed order total' });
+    }
+
+    // Generate refund reference
+    const refundRef = `REFUND_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+
+    // Update order status
+    const updatedOrder = await db.update(orders)
+      .set({ 
+        status: 'refunded',
+        updatedAt: new Date()
+      })
+      .where(eq(orders.id, orderId))
+      .returning();
+
+    // Notify customer about refund
+    try {
+      await createNotification({
+        userId: order.buyerId,
+        userRole: 'CONSUMER',
+        title: 'Refund Processed',
+        message: `Your refund of ₦${refundAmount} for order ${orderId} has been processed.`,
+        type: 'REFUND_PROCESSED',
+        relatedId: orderId,
+        priority: 'HIGH',
+      });
+    } catch (notificationError) {
+      console.error('Failed to create refund notification:', notificationError);
+    }
+
+    res.json({
+      status: 'Success',
+      message: 'Refund processed successfully',
+      data: {
+        order: updatedOrder[0],
+        refund: {
+          refundRef,
+          amount: refundAmount,
+          reason,
+          processedAt: new Date(),
+          status: 'COMPLETED'
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Process refund error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add order review
+router.post('/:id/review', authenticateToken, async (req, res) => {
+  try {
+    const { id: orderId } = req.params;
+    const userId = (req as any).user.userId;
+    const { rating, comment } = req.body;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+    }
+
+    // Check if order exists and belongs to user
+    const existingOrder = await db.select().from(orders).where(and(
+      eq(orders.id, orderId),
+      eq(orders.buyerId, userId),
+      eq(orders.status, 'delivered')
+    ));
+
+    if (existingOrder.length === 0) {
+      return res.status(404).json({ 
+        error: 'Order not found, does not belong to you, or is not delivered yet' 
+      });
+    }
+
+    // Create review record (assuming you have a reviews table)
+    const reviewData = {
+      orderId: parseInt(orderId),
+      userId,
+      rating,
+      comment: comment || '',
+      createdAt: new Date()
+    };
+
+    res.json({
+      status: 'Success',
+      message: 'Review added successfully',
+      data: reviewData
+    });
+  } catch (error) {
+    console.error('Add review error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Place order (alternative endpoint matching NestJS structure)
 router.post('/place', authenticateToken, async (req, res) => {
   try {

@@ -56,7 +56,6 @@ import reviewsRoutes from './routes/reviews';
 import geoRoutes from './routes/geo';
 import driverManagementRoutes from './routes/driver-management';
 import autoAssignmentRoutes from './routes/auto-assignment';
-import searchRoutes from './routes/search';
 
 const app = express();
 const server = createServer(app);
