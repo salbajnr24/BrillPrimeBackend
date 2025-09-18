@@ -296,15 +296,7 @@ function calculateDeliveryFee(distance: number, type: string, size: string): num
   return baseFee + distanceFee + typeFee + sizeFee;
 }
 
-export default router;
-import { Router } from 'express';
-import { eq, and, sql } from 'drizzle-orm';
-import db from '../config/database';
-import { users, userLocations, products, serviceAreas, deliveryZones } from '../schema';
-import { authenticateToken } from '../utils/auth';
-import { Message } from '../utils/messages';
-
-const router = Router();
+// Continue with additional routes
 
 // GET /api/geo/nearby-services - Find nearby services by category
 router.get('/nearby-services', authenticateToken, async (req, res) => {
