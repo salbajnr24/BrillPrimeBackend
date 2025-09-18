@@ -42,6 +42,8 @@ import qrPaymentsRoutes from './routes/qr-payments';
 import liveChatRoutes from './routes/live-chat';
 import walletRoutes from './routes/wallet';
 import securityRoutes from './routes/security';
+import businessCategoriesRoutes from './routes/business-categories';
+import openingHoursRoutes from './routes/opening-hours';
 
 const app = express();
 const server = createServer(app);
@@ -117,6 +119,8 @@ app.use('/api/qr', qrPaymentsRoutes);
 app.use('/api/chat', liveChatRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/security', securityRoutes);
+app.use('/api/business-categories', businessCategoriesRoutes);
+app.use('/api/opening-hours', openingHoursRoutes);
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
@@ -374,6 +378,22 @@ app.get('/api', (req, res) => {
         'POST /api/security/change-password': 'Change user password',
         'POST /api/security/login-history': 'View user login history',
         'GET /api/security/logs': 'Get security logs (admin only)',
+      },
+      businessCategories: {
+        'GET /api/business-categories': 'Get all business categories (public)',
+        'POST /api/business-categories': 'Create business category (admin only)',
+        'GET /api/business-categories/:id': 'Get specific business category (public)',
+        'PUT /api/business-categories/:id': 'Update business category (admin only)',
+        'DELETE /api/business-categories/:id': 'Delete business category (admin only)',
+        'POST /api/business-categories/:id/subcategories': 'Add subcategory to business category (admin only)',
+        'GET /api/business-categories/:id/subcategories': 'Get subcategories of a business category (public)',
+      },
+      openingHours: {
+        'GET /api/opening-hours': 'Get opening hours for all vendors (public)',
+        'POST /api/opening-hours': 'Create opening hours for a vendor (merchant/admin)',
+        'GET /api/opening-hours/:vendorId': 'Get opening hours for a specific vendor (public)',
+        'PUT /api/opening-hours/:id': 'Update opening hours for a vendor (merchant/admin)',
+        'DELETE /api/opening-hours/:id': 'Delete opening hours for a vendor (merchant/admin)',
       },
       trustSafety: {
         'POST /api/report/user/:id': 'Report a user for abuse, scam, etc.',
