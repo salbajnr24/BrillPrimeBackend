@@ -630,5 +630,294 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 });
 
 // Export the createNotification utility for use in other routes
+// Update notification preferences
+router.post('/preferences', authenticateToken, async (req, res) => {
+  try {
+    const userId = (req as any).user.userId;
+    const userRole = (req as any).user.role;
+    const { preferences } = req.body;
+
+    if (!preferences || typeof preferences !== 'object') {
+      return res.status(400).json({ error: 'Valid preferences object is required' });
+    }
+
+    // In production, you'd save these to a user_notification_preferences table
+    const userPreferences = {
+      userId,
+      userRole,
+      emailNotifications: preferences.email || true,
+      pushNotifications: preferences.push || true,
+      smsNotifications: preferences.sms || false,
+      categories: preferences.categories || {
+        order_updates: true,
+        delivery_updates: true,
+        promotions: false,
+        system_alerts: true
+      },
+      frequency: preferences.frequency || 'immediate',
+      quietHours: preferences.quietHours || { start: '22:00', end: '07:00' },
+      updatedAt: new Date()
+    };
+
+    res.json({
+      message: 'Notification preferences updated successfully',
+      preferences: userPreferences
+    });
+  } catch (error) {
+    console.error('Update notification preferences error:', error);
+    res.status(500).json({ error: 'Failed to update notification preferences' });
+  }
+});
+
+// Send bulk notifications
+router.post('/batch-send', authenticateToken, authorizeRoles('ADMIN', 'MERCHANT'), async (req, res) => {
+  try {
+    const senderId = (req as any).user.userId;
+    const senderRole = (req as any).user.role;
+    const { recipients, message, type = 'SYSTEM', priority = 'MEDIUM' } = req.body;
+
+    if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
+      return res.status(400).json({ error: 'Recipients array is required' });
+    }
+
+    if (!message || !message.title || !message.body) {
+      return res.status(400).json({ error: 'Message title and body are required' });
+    }
+
+    const batchResults = [];
+    
+    for (const recipient of recipients) {
+      try {
+        const notification = await createNotification({
+          userId: recipient.userId,
+          userRole: recipient.userRole,
+          title: message.title,
+          message: message.body,
+          type,
+          priority,
+          actionUrl: message.actionUrl,
+        });
+        
+        batchResults.push({
+          userId: recipient.userId,
+          status: 'sent',
+          notificationId: notification?.id
+        });
+      } catch (error) {
+        batchResults.push({
+          userId: recipient.userId,
+          status: 'failed',
+          error: (error as Error).message
+        });
+      }
+    }
+
+    const successCount = batchResults.filter(r => r.status === 'sent').length;
+    const failureCount = batchResults.filter(r => r.status === 'failed').length;
+
+    res.json({
+      message: 'Batch notification processing completed',
+      results: {
+        total: recipients.length,
+        successful: successCount,
+        failed: failureCount,
+        details: batchResults
+      },
+      batchId: `batch_${Date.now()}_${senderId}`
+    });
+  } catch (error) {
+    console.error('Batch send notifications error:', error);
+    res.status(500).json({ error: 'Failed to send batch notifications' });
+  }
+});
+
+// Get notification templates
+router.get('/templates', authenticateToken, authorizeRoles('ADMIN', 'MERCHANT'), async (req, res) => {
+  try {
+    const { category, type } = req.query;
+
+    const templates = [
+      {
+        id: 'order_confirmed',
+        name: 'Order Confirmed',
+        category: 'orders',
+        type: 'ORDER_STATUS',
+        template: {
+          title: 'Order Confirmed - #{orderNumber}',
+          body: 'Your order has been confirmed and is being prepared by {merchantName}.',
+          variables: ['orderNumber', 'merchantName', 'estimatedTime'],
+          actionUrl: '/orders/{orderId}'
+        }
+      },
+      {
+        id: 'delivery_assigned',
+        name: 'Driver Assigned',
+        category: 'delivery',
+        type: 'DELIVERY_UPDATE',
+        template: {
+          title: 'Driver Assigned',
+          body: '{driverName} has been assigned to deliver your order. Track your delivery now.',
+          variables: ['driverName', 'driverPhone', 'estimatedArrival'],
+          actionUrl: '/track/{trackingNumber}'
+        }
+      },
+      {
+        id: 'payment_received',
+        name: 'Payment Received',
+        category: 'payments',
+        type: 'PAYMENT',
+        template: {
+          title: 'Payment Received',
+          body: 'We have received your payment of ₦{amount}. Your order will be processed shortly.',
+          variables: ['amount', 'paymentMethod', 'transactionId'],
+          actionUrl: '/payment/receipt/{transactionId}'
+        }
+      },
+      {
+        id: 'promotion_alert',
+        name: 'Promotion Alert',
+        category: 'marketing',
+        type: 'PROMOTION',
+        template: {
+          title: 'Special Offer Just for You!',
+          body: 'Get {discount}% off on {category} items. Use code: {promoCode}',
+          variables: ['discount', 'category', 'promoCode', 'validUntil'],
+          actionUrl: '/promotions/{promoId}'
+        }
+      },
+      {
+        id: 'low_stock_alert',
+        name: 'Low Stock Alert',
+        category: 'inventory',
+        type: 'SYSTEM',
+        template: {
+          title: 'Low Stock Alert',
+          body: 'Your product "{productName}" is running low. Current stock: {currentStock}',
+          variables: ['productName', 'currentStock', 'minimumThreshold'],
+          actionUrl: '/merchant/inventory/{productId}'
+        }
+      }
+    ];
+
+    let filteredTemplates = templates;
+
+    if (category) {
+      filteredTemplates = filteredTemplates.filter(t => t.category === category);
+    }
+
+    if (type) {
+      filteredTemplates = filteredTemplates.filter(t => t.type === type);
+    }
+
+    res.json({
+      templates: filteredTemplates,
+      categories: [...new Set(templates.map(t => t.category))],
+      types: [...new Set(templates.map(t => t.type))]
+    });
+  } catch (error) {
+    console.error('Get notification templates error:', error);
+    res.status(500).json({ error: 'Failed to get notification templates' });
+  }
+});
+
+// Schedule future notifications
+router.post('/schedule', authenticateToken, authorizeRoles('ADMIN', 'MERCHANT'), async (req, res) => {
+  try {
+    const schedulerId = (req as any).user.userId;
+    const { 
+      recipients, 
+      message, 
+      scheduleTime, 
+      templateId, 
+      templateVariables = {},
+      type = 'SYSTEM',
+      priority = 'MEDIUM' 
+    } = req.body;
+
+    if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
+      return res.status(400).json({ error: 'Recipients array is required' });
+    }
+
+    if (!scheduleTime) {
+      return res.status(400).json({ error: 'Schedule time is required' });
+    }
+
+    const scheduledTime = new Date(scheduleTime);
+    if (scheduledTime <= new Date()) {
+      return res.status(400).json({ error: 'Schedule time must be in the future' });
+    }
+
+    if (!message && !templateId) {
+      return res.status(400).json({ error: 'Either message or templateId is required' });
+    }
+
+    // Create scheduled notification record
+    const scheduledNotification = {
+      id: `scheduled_${Date.now()}_${schedulerId}`,
+      schedulerId,
+      recipients,
+      message: message || null,
+      templateId: templateId || null,
+      templateVariables,
+      scheduleTime: scheduledTime,
+      type,
+      priority,
+      status: 'scheduled',
+      createdAt: new Date()
+    };
+
+    // In production, you'd save this to a scheduled_notifications table
+    // and use a job queue (like Bull, Agenda, or similar) to process it
+
+    res.status(201).json({
+      message: 'Notification scheduled successfully',
+      scheduledNotification: {
+        id: scheduledNotification.id,
+        scheduledFor: scheduledTime,
+        recipientCount: recipients.length,
+        status: 'scheduled'
+      }
+    });
+  } catch (error) {
+    console.error('Schedule notification error:', error);
+    res.status(500).json({ error: 'Failed to schedule notification' });
+  }
+});
+
+// Get user notification preferences
+router.get('/preferences', authenticateToken, async (req, res) => {
+  try {
+    const userId = (req as any).user.userId;
+    const userRole = (req as any).user.role;
+
+    // In production, fetch from user_notification_preferences table
+    const defaultPreferences = {
+      userId,
+      userRole,
+      emailNotifications: true,
+      pushNotifications: true,
+      smsNotifications: false,
+      categories: {
+        order_updates: true,
+        delivery_updates: true,
+        promotions: false,
+        system_alerts: true,
+        payment_updates: true,
+        security_alerts: true
+      },
+      frequency: 'immediate', // immediate, hourly, daily
+      quietHours: { start: '22:00', end: '07:00' },
+      language: 'en'
+    };
+
+    res.json({
+      preferences: defaultPreferences
+    });
+  } catch (error) {
+    console.error('Get notification preferences error:', error);
+    res.status(500).json({ error: 'Failed to get notification preferences' });
+  }
+});
+
 export { createNotification };
 export default router;

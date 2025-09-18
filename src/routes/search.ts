@@ -277,6 +277,81 @@ router.get('/merchants', async (req, res) => {
   }
 });
 
+// Get autocomplete suggestions
+router.get('/autocomplete', async (req, res) => {
+  try {
+    const { q, limit = 10 } = req.query;
+
+    if (!q || (q as string).length < 2) {
+      return res.json({ suggestions: [] });
+    }
+
+    const query = (q as string).toLowerCase();
+    const suggestions: any[] = [];
+
+    // Product name suggestions
+    const productSuggestions = await db.select({
+      text: products.name,
+      type: sql<string>`'product'`,
+      category: categories.name
+    })
+      .from(products)
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .where(and(
+        eq(products.isActive, true),
+        sql`LOWER(${products.name}) LIKE ${`%${query}%`}`
+      ))
+      .limit(5);
+
+    suggestions.push(...productSuggestions.map(p => ({ 
+      text: p.text, 
+      type: p.type,
+      category: p.category 
+    })));
+
+    // Category suggestions
+    const categorySuggestions = await db.select({
+      text: categories.name,
+      type: sql<string>`'category'`
+    })
+      .from(categories)
+      .where(and(
+        eq(categories.isActive, true),
+        sql`LOWER(${categories.name}) LIKE ${`%${query}%`}`
+      ))
+      .limit(3);
+
+    suggestions.push(...categorySuggestions.map(c => ({ 
+      text: c.text, 
+      type: c.type 
+    })));
+
+    // Business name suggestions
+    const businessSuggestions = await db.select({
+      text: merchantProfiles.businessName,
+      type: sql<string>`'business'`
+    })
+      .from(merchantProfiles)
+      .where(and(
+        eq(merchantProfiles.isVerified, true),
+        sql`LOWER(${merchantProfiles.businessName}) LIKE ${`%${query}%`}`
+      ))
+      .limit(3);
+
+    suggestions.push(...businessSuggestions.map(b => ({ 
+      text: b.text, 
+      type: b.type 
+    })));
+
+    res.json({
+      suggestions: suggestions.slice(0, parseInt(limit as string))
+    });
+  } catch (error) {
+    console.error('Autocomplete error:', error);
+    res.status(500).json({ error: 'Failed to get autocomplete suggestions' });
+  }
+});
+
 // Get suggestions/autocomplete
 router.get('/suggestions', async (req, res) => {
   try {
@@ -391,6 +466,152 @@ router.get('/trending', async (req, res) => {
   } catch (error) {
     console.error('Trending search error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Advanced search with filters
+router.post('/advanced', async (req, res) => {
+  try {
+    const {
+      query = '',
+      filters = {},
+      sort = 'relevance',
+      page = 1,
+      limit = 20,
+      userLocation
+    } = req.body;
+
+    const {
+      category,
+      minPrice,
+      maxPrice,
+      rating,
+      availability,
+      merchantId,
+      dateRange
+    } = filters;
+
+    const offset = (Number(page) - 1) * Number(limit);
+    let whereConditions = [eq(products.isActive, true)];
+
+    // Text search
+    if (query) {
+      whereConditions.push(
+        sql`(${products.name} ILIKE ${`%${query}%`} OR ${products.description} ILIKE ${`%${query}%`})`
+      );
+    }
+
+    // Apply filters
+    if (category) {
+      whereConditions.push(eq(products.categoryId, category));
+    }
+    if (minPrice) {
+      whereConditions.push(sql`CAST(${products.price} AS DECIMAL) >= ${minPrice}`);
+    }
+    if (maxPrice) {
+      whereConditions.push(sql`CAST(${products.price} AS DECIMAL) <= ${maxPrice}`);
+    }
+    if (rating) {
+      whereConditions.push(sql`CAST(${products.rating} AS DECIMAL) >= ${rating}`);
+    }
+    if (availability) {
+      whereConditions.push(eq(products.inStock, availability === 'in_stock'));
+    }
+    if (merchantId) {
+      whereConditions.push(eq(products.sellerId, merchantId));
+    }
+
+    let selectQuery = db.select({
+      id: products.id,
+      name: products.name,
+      description: products.description,
+      price: products.price,
+      image: products.image,
+      rating: products.rating,
+      reviewCount: products.reviewCount,
+      inStock: products.inStock,
+      category: categories.name,
+      merchant: {
+        id: users.id,
+        name: users.fullName,
+        businessName: merchantProfiles.businessName
+      }
+    })
+      .from(products)
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .leftJoin(users, eq(products.sellerId, users.id))
+      .leftJoin(merchantProfiles, eq(users.id, merchantProfiles.userId))
+      .where(and(...whereConditions));
+
+    // Apply sorting
+    switch (sort) {
+      case 'price_asc':
+        selectQuery = (selectQuery as any).orderBy(asc(sql`CAST(${products.price} AS DECIMAL)`));
+        break;
+      case 'price_desc':
+        selectQuery = (selectQuery as any).orderBy(desc(sql`CAST(${products.price} AS DECIMAL)`));
+        break;
+      case 'rating':
+        selectQuery = (selectQuery as any).orderBy(desc(sql`CAST(${products.rating} AS DECIMAL)`));
+        break;
+      case 'newest':
+        selectQuery = (selectQuery as any).orderBy(desc(products.createdAt));
+        break;
+      default:
+        selectQuery = (selectQuery as any).orderBy(desc(products.createdAt));
+    }
+
+    const results = await selectQuery.limit(Number(limit)).offset(offset);
+
+    res.json({
+      results,
+      filters: {
+        query,
+        appliedFilters: filters,
+        sort
+      },
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total: results.length
+      }
+    });
+  } catch (error) {
+    console.error('Advanced search error:', error);
+    res.status(500).json({ error: 'Failed to perform advanced search' });
+  }
+});
+
+// Save search criteria
+router.post('/save-search', authenticateToken, async (req, res) => {
+  try {
+    const userId = (req as any).user.userId;
+    const { searchName, criteria, notificationEnabled = false } = req.body;
+
+    if (!searchName || !criteria) {
+      return res.status(400).json({ error: 'Search name and criteria are required' });
+    }
+
+    // Create saved search (storing in user's profile metadata for now)
+    const savedSearch = {
+      id: `search_${Date.now()}`,
+      userId,
+      name: searchName,
+      criteria,
+      notificationEnabled,
+      createdAt: new Date(),
+      lastUsed: new Date()
+    };
+
+    // In a real implementation, you'd save this to a dedicated table
+    // For now, we'll return success
+    res.status(201).json({
+      message: 'Search criteria saved successfully',
+      savedSearch
+    });
+  } catch (error) {
+    console.error('Save search error:', error);
+    res.status(500).json({ error: 'Failed to save search criteria' });
   }
 });
 

@@ -44,6 +44,8 @@ import walletRoutes from './routes/wallet';
 import securityRoutes from './routes/security';
 import businessCategoriesRoutes from './routes/business-categories';
 import openingHoursRoutes from './routes/opening-hours';
+import reviewsRoutes from './routes/reviews';
+import geoRoutes from './routes/geo';
 
 const app = express();
 const server = createServer(app);
@@ -121,6 +123,8 @@ app.use('/api/wallet', walletRoutes);
 app.use('/api/security', securityRoutes);
 app.use('/api/business-categories', businessCategoriesRoutes);
 app.use('/api/opening-hours', openingHoursRoutes);
+app.use('/api/reviews', reviewsRoutes);
+app.use('/api/geo', geoRoutes);
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
