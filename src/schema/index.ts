@@ -494,7 +494,7 @@ export const vendorPostComments = pgTable('vendor_post_comments', {
   postId: uuid('post_id').notNull().references(() => vendorPosts.id),
   userId: integer('user_id').notNull().references(() => users.id),
   content: text('content').notNull(),
-  parentCommentId: uuid('parent_comment_id').references(() => vendorPostComments.id),
+  parentCommentId: uuid('parent_comment_id'),
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
