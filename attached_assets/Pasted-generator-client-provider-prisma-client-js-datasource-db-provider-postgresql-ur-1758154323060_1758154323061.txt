@@ -1,0 +1,196 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String      @id @default(uuid()) @db.Uuid
+  email     String      @unique
+  fullName  String
+  password  String
+  imageUrl  String?
+  otp       String?
+  phone     String?
+  verified  Boolean     @default(false)
+  role      Role
+  location  String?
+  Cart      Cart?
+  Commodity Commodity[]
+  Order     Order[]
+  vendor  Vendor?
+  driver    Driver?
+  isDeleted Boolean     @default(false) @map("is_deleted")
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt @map("updated_at")
+  deletedAt DateTime?   @map("deleted_at")
+}
+
+model Vendor {
+  id              String         @id @default(uuid()) @db.Uuid
+  accountName     String?
+  bankName        String?
+  accountNumber   String?
+  bankCode        String?
+  address         String
+  userId          String         @unique @db.Uuid
+  user            User           @relation(fields: [userId], references: [id])
+  businessCategory String?
+  businessNumber  String?
+  businessName    String
+  businessEmail    String?
+  openingHours    OpeningHours[] // One-to-many relationship with OpeningHours
+  isDeleted Boolean?     @default(false) @map("is_deleted")
+  createdAt DateTime?    @default(now())
+  updatedAt DateTime?    @updatedAt @map("updated_at")
+  deletedAt DateTime?   @map("deleted_at")
+}
+
+model OpeningHours {
+  id          String   @id @default(uuid())
+  dayOfWeek   String?   // e.g., "Monday", "Tuesday", etc.
+  openTime    String?   // Opening time (e.g., "08:00")
+  closeTime   String?   // Closing time (e.g., "20:00")
+  vendorId    String   @db.Uuid
+  vendor      Vendor   @relation(fields: [vendorId], references: [id])
+
+  @@unique([vendorId, dayOfWeek]) // Ensure no duplicate days for a vendor
+  isDeleted Boolean?     @default(false) @map("is_deleted")
+  createdAt DateTime?   @default(now())
+  updatedAt DateTime?    @updatedAt @map("updated_at")
+  deletedAt DateTime?   @map("deleted_at")
+}
+
+model Driver {
+  id           String  @id @default(uuid())
+  plateNumber String
+  userId       String  @unique  @db.Uuid
+  user         User    @relation(fields: [userId], references: [id])
+}
+
+model Commodity {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String
+  description String?
+  price     String
+  quantity  Int
+  imageUrl  String?
+  unit      String?
+  vendorId  String    @db.Uuid
+  Vendor    User      @relation(fields: [vendorId], references: [id])
+  // Orders    Order[]
+  // Cart      Cart[]
+  category  String?
+  isDeleted Boolean   @default(false) @map("is_deleted")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  CartItem CartItem[]
+}
+
+model Order {
+  id          String    @id @default(uuid()) @db.Uuid
+  totalPrice  Float
+  // cart        Cart     @relation(fields: [cartId], references: [id])
+  // cartId      String    @db.Uuid
+  consumerId  String    @db.Uuid
+  vendorId    String    @db.Uuid
+  status      Status    @default(PENDING)
+  txRef       String?   @unique
+  transactionId String?
+  Consumer    User      @relation(fields: [consumerId], references: [id])
+  items    OrderItem[] // Stores cart items instead of cart reference
+
+  isDeleted   Boolean   @default(false) @map("is_deleted")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+}
+
+model OrderItem {
+  id                  String   @id @default(uuid()) @db.Uuid
+  orderId             String   @db.Uuid
+  order               Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  cartId              String   @db.Uuid
+  commodityId         String   @db.Uuid
+  quantity            Int
+  commodityName       String
+  commodityDescription String?
+  commodityPrice      String
+  unit               String?
+  imageUrl           String?
+  vendorId           String   @db.Uuid
+
+  isDeleted          Boolean  @default(false) @map("is_deleted")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
+}
+
+
+model Cart {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @db.Uuid @unique
+  User        User      @relation(fields: [userId], references: [id])
+  items       CartItem[]
+  isDeleted   Boolean   @default(false) @map("is_deleted")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  // Order Order[]
+}
+
+model CartItem {
+  id        String   @id @default(uuid())
+  cart      Cart     @relation(fields: [cartId], references: [id])
+  cartId    String    @db.Uuid
+  commodity   Commodity  @relation(fields: [commodityId], references: [id])
+  commodityId String    @db.Uuid
+  vendorId String?    @db.Uuid
+  quantity  Int
+  isDeleted   Boolean   @default(false) @map("is_deleted")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt   DateTime? @map("deleted_at")
+  // Order Order[]
+}
+
+model BusinessCategory {
+  id          String            @id @default(uuid())
+  name        String            @unique
+  imageUrl    String?
+  subcategories CommodityCategory[]
+  isDeleted   Boolean   @default(false) @map("is_deleted")
+  createdAt DateTime? @default(now())
+  updatedAt DateTime? @updatedAt
+  deletedAt   DateTime? @map("deleted_at")
+}
+
+model CommodityCategory {
+  id          String   @id @default(uuid())
+  name        String
+  businessCategoryId String
+  businessCategory   BusinessCategory @relation(fields: [businessCategoryId], references: [id])
+  isDeleted   Boolean   @default(false) @map("is_deleted")
+  createdAt DateTime? @default(now())
+  updatedAt DateTime? @updatedAt
+  deletedAt   DateTime? @map("deleted_at")
+}
+
+enum Role {
+  CONSUMER
+  VENDOR
+  DRIVER
+}
+
+enum Status {
+  FAILED
+  PENDING
+  PAID
+  COMPLETE
+}
