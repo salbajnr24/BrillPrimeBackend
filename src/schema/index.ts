@@ -90,7 +90,7 @@ export const commodityCategories = pgTable('commodity_categories', {
 // Opening Hours table
 export const openingHours = pgTable('opening_hours', {
   id: uuid('id').primaryKey().defaultRandom(),
-  vendorId: uuid('vendor_id').notNull().references(() => users.id),
+  vendorId: integer('vendor_id').notNull().references(() => users.id),
   dayOfWeek: varchar('day_of_week', { length: 20 }),
   openTime: varchar('open_time', { length: 10 }),
   closeTime: varchar('close_time', { length: 10 }),
@@ -105,7 +105,7 @@ export const openingHours = pgTable('opening_hours', {
 // Search functionality tables
 export const searchHistory = pgTable('search_history', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id),
+  userId: integer('user_id').references(() => users.id),
   searchTerm: varchar('search_term', { length: 255 }).notNull(),
   filters: json('filters'),
   resultsCount: integer('results_count').default(0),
@@ -125,7 +125,7 @@ export const trendingSearches = pgTable('trending_searches', {
 // Reviews functionality tables
 export const reviews = pgTable('reviews', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id).notNull(),
+  userId: integer('user_id').references(() => users.id).notNull(),
   productId: uuid('product_id').references(() => products.id).notNull(),
   orderId: uuid('order_id').references(() => orders.id),
   rating: integer('rating').notNull(),
@@ -143,7 +143,7 @@ export const reviews = pgTable('reviews', {
 export const reviewResponses = pgTable('review_responses', {
   id: uuid('id').primaryKey().defaultRandom(),
   reviewId: uuid('review_id').references(() => reviews.id).notNull(),
-  sellerId: uuid('seller_id').references(() => users.id).notNull(),
+  sellerId: integer('seller_id').references(() => users.id).notNull(),
   response: text('response').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
