@@ -1,4 +1,4 @@
-modules = ["nodejs-18"]
+modules = ["nodejs-18", "postgresql-16"]
 [agent]
 expertMode = true
 integrations = ["javascript_supabase:1.0.0"]
@@ -34,6 +34,10 @@ externalPort = 3000
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 34391
+externalPort = 3001
 
 [nix]
 channel = "stable-25_05"

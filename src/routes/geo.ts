@@ -2,8 +2,9 @@
 import { Router } from 'express';
 import { eq, and, sql } from 'drizzle-orm';
 import db from '../config/database';
-import { users, merchantProfiles, products } from '../schema';
-import { authenticateToken } from '../utils/auth';
+import { users, merchantProfiles, products, userLocations } from '../schema';
+import { Message } from '../utils/messages';
+import { authenticateToken, authorizeRoles } from '../utils/auth';
 
 const router = Router();
 
